@@ -1,0 +1,647 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="UTF-8" />
+    <style>
+      :root {
+        --bg: #f6f3ee;
+        --panel: #fffaf2;
+        --card: #ffffff;
+        --text: #1f1d1a;
+        --muted: #6d675f;
+        --border: #eadfce;
+        --success: #17824f;
+        --warning: #9a6b16;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        padding: 16px;
+        font-family: Inter, Arial, sans-serif;
+        font-size: 12px;
+        line-height: 1.4;
+        color: var(--text);
+        background: linear-gradient(180deg, #f8f5ef 0%, #f2eee7 100%);
+      }
+
+      .app {
+        display: flex;
+        flex-direction: column;
+        gap: 14px;
+      }
+
+      .hero,
+      .card,
+      .summary,
+      .result {
+        background: #ffffff;
+        border: 1px solid var(--border);
+        border-radius: 16px;
+        padding: 14px;
+      }
+
+      h1 {
+        margin: 0 0 6px;
+        font-size: 22px;
+        line-height: 1.1;
+      }
+
+      .subtitle,
+      .meta,
+      .back-link,
+      .hint {
+        color: var(--muted);
+      }
+
+      .subtitle,
+      .meta,
+      .hint {
+        font-size: 13px;
+      }
+
+      .section-title,
+      .result-title,
+      label {
+        font-size: 11px;
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+        color: var(--muted);
+      }
+
+      .grid,
+      .cards {
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+      }
+
+      .action-card {
+        width: 100%;
+        text-align: left;
+        border: 1px solid var(--border);
+        border-radius: 16px;
+        background: #fff;
+        padding: 14px;
+        cursor: pointer;
+      }
+
+      .action-title {
+        display: block;
+        margin-bottom: 4px;
+        font-size: 16px;
+        font-weight: 700;
+      }
+
+      .action-desc {
+        color: var(--muted);
+        font-size: 12px;
+      }
+
+      .hidden {
+        display: none !important;
+      }
+
+      .back-link {
+        border: 0;
+        background: transparent;
+        padding: 0;
+        cursor: pointer;
+        width: fit-content;
+        margin-bottom: 8px;
+      }
+
+      button {
+        border: 0;
+        border-radius: 12px;
+        padding: 10px 14px;
+        cursor: pointer;
+        font-size: 12px;
+      }
+
+      .primary-btn {
+        background: #111;
+        color: white;
+      }
+
+      .secondary-btn {
+        background: #e9e4db;
+        color: var(--text);
+      }
+
+      .hero-actions {
+        margin-top: 16px;
+      }
+
+      .sticky-summary {
+        position: sticky;
+        top: 8px;
+        z-index: 3;
+        margin-top: 10px;
+        margin-bottom: 10px;
+      }
+
+      .summary-actions {
+        display: flex;
+        gap: 8px;
+        margin-top: 12px;
+      }
+
+      .token-head {
+        display: flex;
+        justify-content: space-between;
+        gap: 12px;
+        align-items: flex-start;
+        margin-bottom: 8px;
+      }
+
+      .token-name {
+        font-size: 16px;
+        font-weight: 700;
+        word-break: break-word;
+      }
+
+      .badge-done,
+      .badge-review {
+        display: inline-flex;
+        align-items: center;
+        padding: 5px 9px;
+        border-radius: 999px;
+        font-size: 11px;
+        font-weight: 700;
+      }
+
+      .badge-done {
+        background: rgba(23, 130, 79, 0.12);
+        color: var(--success);
+      }
+
+      .badge-review {
+        background: rgba(154, 107, 22, 0.12);
+        color: var(--warning);
+      }
+
+      .collapsed .card-body {
+        display: none;
+      }
+
+      .row {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+        margin-top: 12px;
+      }
+
+      .scope-row {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 8px;
+      }
+
+      select {
+        width: 100%;
+        border: 1px solid var(--border);
+        border-radius: 10px;
+        background: white;
+        padding: 10px 12px;
+        font-size: 12px;
+      }
+
+      .actions {
+        display: flex;
+        gap: 8px;
+        margin-top: 12px;
+      }
+
+      #resultText,
+      #scopeSummaryText {
+        white-space: pre-wrap;
+        font-size: 13px;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="app">
+      <div id="homeView">
+        <div class="hero">
+          <div class="section-title">Component Review</div>
+          <h1>Extra Review</h1>
+          <p class="subtitle">Выбери, что именно хочешь проверить или исправить в компоненте.</p>
+        </div>
+
+        <div class="grid">
+          <button class="action-card" data-action="broken-tokens">
+            <span class="action-title">Проверить битые токены</span>
+            <span class="action-desc">Найти удалённые или потерянные variable bindings у выбранного слоя.</span>
+          </button>
+
+          <button class="action-card" data-action="raw-values">
+            <span class="action-title">Найти значения без токенов</span>
+            <span class="action-desc">Показать свойства, где есть значение, но нет token binding.</span>
+          </button>
+
+          <button class="action-card" data-action="scope-review">
+            <span class="action-title">Определить scope</span>
+            <span class="action-desc">Проверить только локальные токены текущего файла.</span>
+          </button>
+
+          <button class="action-card" data-action="unused-tokens">
+            <span class="action-title">Найти неиспользуемые токены</span>
+            <span class="action-desc">Проверить выбранную коллекцию на неиспользуемые токены на странице.</span>
+          </button>
+        </div>
+      </div>
+
+      <div id="scopeView" class="hidden">
+        <div class="hero">
+          <button id="backToHome" class="back-link">← Extra Review / Scope Review</button>
+          <h1>Определить scope</h1>
+          <p class="subtitle">Выбери объекты в Figma и нажми «Проверить scope».</p>
+          <div class="hero-actions">
+            <button id="analyzeScopes" class="primary-btn">Проверить scope</button>
+          </div>
+        </div>
+
+        <div id="scopeSummary" class="summary sticky-summary hidden">
+          <div id="scopeSummaryText"></div>
+          <div class="summary-actions">
+            <button id="applyAll" class="secondary-btn">Применить выбранные</button>
+          </div>
+        </div>
+
+        <div id="scopeCards" class="cards hidden"></div>
+      </div>
+
+      <div class="result">
+        <div class="result-title">Result</div>
+        <div id="resultText">Выбери раздел выше, чтобы запустить проверку.</div>
+      </div>
+    </div>
+
+    <script>
+      const homeView = document.getElementById("homeView");
+      const scopeView = document.getElementById("scopeView");
+      const scopeCards = document.getElementById("scopeCards");
+      const scopeSummary = document.getElementById("scopeSummary");
+      const scopeSummaryText = document.getElementById("scopeSummaryText");
+      const resultText = document.getElementById("resultText");
+
+      function debugLog(label, payload) {
+        if (payload === undefined) {
+          console.log(`[ui] ${label}`);
+        } else {
+          console.log(`[ui] ${label}`, payload);
+        }
+      }
+
+      window.onerror = function (message, source, lineno, colno, error) {
+        console.error("[ui] window.onerror", {
+          message,
+          source,
+          lineno,
+          colno,
+          stack: error && error.stack ? error.stack : String(error)
+        });
+      };
+
+      window.onunhandledrejection = function (event) {
+        console.error("[ui] unhandledrejection", event.reason);
+      };
+
+      debugLog("script loaded");
+
+      let currentItems = [];
+      let lastSummaryText = "";
+
+      function showHome() {
+        debugLog("showHome");
+        homeView.classList.remove("hidden");
+        scopeView.classList.add("hidden");
+      }
+
+      function showScope() {
+        debugLog("showScope");
+        homeView.classList.add("hidden");
+        scopeView.classList.remove("hidden");
+      }
+
+      function getSummaryCounts() {
+        const total = currentItems.length;
+        const done = currentItems.filter((item) => item.isScopeMatched).length;
+        const needReview = total - done;
+
+        debugLog("getSummaryCounts", { total, done, needReview });
+
+        return { total, done, needReview };
+      }
+
+      function updateSummaryText() {
+        debugLog("updateSummaryText start");
+        if (!lastSummaryText) {
+          debugLog("updateSummaryText skipped: no summary");
+          return;
+        }
+
+        const lines = lastSummaryText.split("\n");
+        const counts = getSummaryCounts();
+
+        const updated = lines.map((line) => {
+          if (line.startsWith("Нужно проверить:")) {
+            return `Нужно проверить: ${counts.needReview}`;
+          }
+
+          if (line.startsWith("Совпадают с предложенными:")) {
+            return `Совпадают с предложенными: ${counts.done}`;
+          }
+
+          if (line.startsWith("Все scope совпадают")) {
+            return counts.needReview === 0
+              ? "Все scope совпадают с предложенными scope."
+              : `Совпадают с предложенными: ${counts.done}`;
+          }
+
+          return line;
+        });
+
+        if (
+          !updated.some((line) => line.startsWith("Совпадают с предложенными:")) &&
+          !updated.some((line) => line.startsWith("Все scope совпадают"))
+        ) {
+          updated.push(
+            counts.needReview === 0
+              ? "Все scope совпадают с предложенными scope."
+              : `Совпадают с предложенными: ${counts.done}`
+          );
+        }
+
+        scopeSummaryText.textContent = updated.join("\n");
+        debugLog("updateSummaryText done", { text: scopeSummaryText.textContent });
+      }
+
+      function applyCardUpdate(variableId, scopes) {
+        debugLog("applyCardUpdate start", { variableId, scopes });
+
+        const item = currentItems.find((entry) => entry.variableId === variableId);
+        if (!item) {
+          debugLog("applyCardUpdate skipped: item not found", { variableId });
+          return;
+        }
+
+        item.currentScopesText = scopes.length ? scopes.join(", ") : "No scopes set";
+        item.selectedScopes = [...scopes];
+        item.isScopeMatched = true;
+
+        const current = document.getElementById(`current-${variableId}`);
+        const badge = document.getElementById(`badge-${variableId}`);
+        const card = document.getElementById(`card-${variableId}`);
+
+        debugLog("applyCardUpdate dom refs", {
+          variableId,
+          hasCurrent: !!current,
+          hasBadge: !!badge,
+          hasCard: !!card
+        });
+
+        if (current) {
+          current.textContent = `Current scope: ${item.currentScopesText}`;
+        }
+
+        if (badge) {
+          badge.textContent = "Done";
+          badge.className = "badge-done";
+        }
+
+        if (card) {
+          card.classList.add("collapsed");
+        }
+
+        updateSummaryText();
+        debugLog("applyCardUpdate done", { variableId });
+      }
+
+      function getSelectedScopes(variableId) {
+        debugLog("getSelectedScopes start", { variableId });
+
+        const select1 = document.getElementById(`scope1-${variableId}`);
+        const select2 = document.getElementById(`scope2-${variableId}`);
+
+        debugLog("getSelectedScopes refs", {
+          variableId,
+          hasSelect1: !!select1,
+          hasSelect2: !!select2
+        });
+
+        const values = [select1?.value || "", select2?.value || ""]
+          .filter((value) => value && value !== "NONE");
+
+        const result = [...new Set(values)];
+
+        debugLog("getSelectedScopes result", { variableId, result });
+
+        return result;
+      }
+
+      function renderScopeCards(items) {
+        debugLog("renderScopeCards start", { count: items.length });
+
+        currentItems = items;
+        scopeCards.classList.remove("hidden");
+
+        if (!items.length) {
+          debugLog("renderScopeCards empty");
+          scopeCards.innerHTML = `
+            <div class="card">
+              <div class="meta">Проблемных локальных токенов в текущем выделении не найдено.</div>
+            </div>
+          `;
+          return;
+        }
+
+        scopeCards.innerHTML = items.map((item, index) => {
+          debugLog("render item start", {
+            index,
+            variableId: item.variableId,
+            variableName: item.variableName,
+            selectedScopes: item.selectedScopes,
+            allowedScopesCount: item.allowedScopes ? item.allowedScopes.length : 0,
+            isScopeMatched: item.isScopeMatched
+          });
+
+          const selectOptions = item.allowedScopes.map((scope) => {
+            const firstSelected = item.selectedScopes[0] === scope ? "selected" : "";
+            return `<option value="${scope}" ${firstSelected}>${scope}</option>`;
+          }).join("");
+
+          debugLog("first select built", { variableId: item.variableId });
+
+          const secondOptions = [
+            '<option value="NONE">—</option>',
+            ...item.allowedScopes.map((scope) => {
+              const secondSelected = item.selectedScopes[1] === scope ? "selected" : "";
+              return `<option value="${scope}" ${secondSelected}>${scope}</option>`;
+            })
+          ].join("");
+
+          debugLog("second select built", { variableId: item.variableId });
+
+          const collapsedClass = item.isScopeMatched ? "collapsed" : "";
+
+          return `
+            <div class="card ${collapsedClass}" id="card-${item.variableId}">
+              <div class="token-head">
+                <div class="token-name">${item.variableName}</div>
+                <div class="${item.isScopeMatched ? "badge-done" : "badge-review"}" id="badge-${item.variableId}">
+                  ${item.isScopeMatched ? "Done" : "Need review"}
+                </div>
+              </div>
+
+              <div class="meta" id="current-${item.variableId}">Current scope: ${item.currentScopesText}</div>
+              <div class="meta">Suggested scope: ${item.suggestedScopesText}</div>
+
+              <div class="card-body">
+                <div class="scope-row">
+                  <div class="row">
+                    <label for="scope1-${item.variableId}">Scope 1</label>
+                    <select id="scope1-${item.variableId}">
+                      ${selectOptions}
+                    </select>
+                  </div>
+
+                  <div class="row">
+                    <label for="scope2-${item.variableId}">Scope 2</label>
+                    <select id="scope2-${item.variableId}">
+                      ${secondOptions}
+                    </select>
+                  </div>
+                </div>
+
+                <div class="hint">Во втором поле можно оставить прочерк, если нужен только один scope.</div>
+
+                <div class="actions">
+                  <button class="primary-btn" data-apply-id="${item.variableId}">Apply</button>
+                </div>
+              </div>
+            </div>
+          `;
+        }).join("");
+
+        debugLog("renderScopeCards innerHTML applied");
+
+        const applyButtons = document.querySelectorAll("[data-apply-id]");
+        debugLog("apply buttons found", { count: applyButtons.length });
+
+        applyButtons.forEach((button) => {
+          button.addEventListener("click", () => {
+            const variableId = button.getAttribute("data-apply-id");
+            debugLog("apply click", { variableId });
+
+            if (!variableId) return;
+
+            parent.postMessage(
+              {
+                pluginMessage: {
+                  type: "apply-scope",
+                  variableId,
+                  scopes: getSelectedScopes(variableId)
+                }
+              },
+              "*"
+            );
+          });
+        });
+
+        debugLog("renderScopeCards listeners attached");
+      }
+
+      document.querySelectorAll(".action-card").forEach((button) => {
+        button.addEventListener("click", () => {
+          const action = button.dataset.action;
+          debugLog("home action click", { action });
+
+          if (action === "scope-review") {
+            showScope();
+            resultText.textContent = "Открылся раздел Scope Review.";
+            return;
+          }
+
+          parent.postMessage({ pluginMessage: { type: "run-check", action } }, "*");
+        });
+      });
+
+      document.getElementById("backToHome").addEventListener("click", () => {
+        debugLog("back click");
+        showHome();
+      });
+
+      document.getElementById("analyzeScopes").addEventListener("click", () => {
+        debugLog("analyzeScopes click");
+        parent.postMessage({ pluginMessage: { type: "run-scope-review" } }, "*");
+      });
+
+      document.getElementById("applyAll").addEventListener("click", () => {
+        debugLog("applyAll click start");
+
+        const updates = currentItems
+          .filter((item) => !item.isScopeMatched)
+          .map((item) => ({
+            variableId: item.variableId,
+            scopes: getSelectedScopes(item.variableId)
+          }));
+
+        debugLog("applyAll updates", updates);
+
+        parent.postMessage(
+          {
+            pluginMessage: {
+              type: "apply-all-scopes",
+              updates
+            }
+          },
+          "*"
+        );
+      });
+
+      window.onmessage = (event) => {
+        const msg = event.data.pluginMessage;
+        debugLog("message received", msg);
+
+        if (!msg) return;
+
+        if (msg.type === "analysis-result") {
+          resultText.textContent = msg.text;
+        }
+
+        if (msg.type === "scope-review-result") {
+          debugLog("scope-review-result start");
+          showScope();
+          lastSummaryText = msg.summary || "";
+          scopeSummary.classList.remove("hidden");
+          scopeSummaryText.textContent = lastSummaryText;
+          renderScopeCards(msg.items || []);
+          resultText.textContent = "Проверка scope выполнена.";
+          debugLog("scope-review-result done");
+        }
+
+        if (msg.type === "apply-result") {
+          debugLog("apply-result start", msg);
+          resultText.textContent = msg.text;
+
+          if (msg.variableId && Array.isArray(msg.scopes)) {
+            applyCardUpdate(msg.variableId, msg.scopes);
+          }
+
+          if (Array.isArray(msg.updates)) {
+            msg.updates.forEach((update) => {
+              applyCardUpdate(update.variableId, update.scopes);
+            });
+          }
+
+          debugLog("apply-result done");
+        }
+      };
+    </script>
+  </body>
+</html>
