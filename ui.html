@@ -127,6 +127,14 @@
         color: white;
       }
 
+      .primary-btn:disabled,
+      .secondary-btn:disabled,
+      button:disabled {
+        background: #d8d1c4;
+        color: #8f877b;
+        cursor: not-allowed;
+      }
+
       .secondary-btn {
         background: #e9e4db;
         color: var(--text);
@@ -216,10 +224,87 @@
         margin-top: 12px;
       }
 
-      #resultText,
-      #scopeSummaryText {
+      .actions .secondary-btn {
+        flex: 1;
+      }
+
+      .actions .primary-btn {
+        flex: 1;
+      }
+
+      .result-block {
+        margin-top: 12px;
+      }
+
+      .toggle-details {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        width: 100%;
+        margin-top: 8px;
+        text-align: center;
+      }
+
+      .details-panel {
+        margin-top: 8px;
+        padding: 12px;
+        border: 1px solid var(--border);
+        border-radius: 12px;
+        background: #faf7f1;
+      }
+
+      .summary-block {
         white-space: pre-wrap;
         font-size: 13px;
+      }
+
+      .compact-block {
+        margin-top: 10px;
+      }
+
+      .details-list {
+        margin: 6px 0 0;
+        padding-left: 18px;
+      }
+
+      .details-list li {
+        margin-bottom: 6px;
+        word-break: break-word;
+      }
+
+      .case-list {
+        list-style: none;
+        padding-left: 0;
+        margin: 6px 0 0;
+      }
+
+      .case-item {
+        display: flex;
+        align-items: flex-start;
+        gap: 10px;
+        margin-bottom: 10px;
+      }
+
+      .case-checkbox {
+        width: 18px;
+        height: 18px;
+        margin-top: 2px;
+      }
+
+      .case-label {
+        flex: 1;
+        font-size: 13px;
+        line-height: 1.4;
+        word-break: break-word;
+      }
+
+      #resultText,
+      #scopeSummaryText {
+        font-size: 13px;
+      }
+
+      #scopeSummaryText {
+        white-space: pre-wrap;
       }
     </style>
   </head>
@@ -239,8 +324,8 @@
           </button>
 
           <button class="action-card" data-action="raw-values">
-            <span class="action-title">Найти значения без токенов</span>
-            <span class="action-desc">Показать свойства, где есть значение, но нет token binding.</span>
+            <span class="action-title">Применить токен</span>
+            <span class="action-desc">Найти значения без токенов и предложить подходящие токены.</span>
           </button>
 
           <button class="action-card" data-action="scope-review">
@@ -275,7 +360,27 @@
         <div id="scopeCards" class="cards hidden"></div>
       </div>
 
-      <div class="result">
+      <div id="applyTokenView" class="hidden">
+        <div class="hero">
+          <button id="backToHomeFromApplyToken" class="back-link">← Extra Review / Apply Token</button>
+          <h1>Применить токен</h1>
+          <p class="subtitle">Выбери объекты в Figma и нажми «Найти значения без токенов».</p>
+          <div class="hero-actions">
+            <button id="analyzeApplyTokens" class="primary-btn">Найти значения без токенов</button>
+          </div>
+          <div class="hero-actions hidden" id="ignoredApplyTokenActions">
+            <button id="toggleIgnoredApplyTokens" class="secondary-btn">Показать скрытые</button>
+          </div>
+        </div>
+
+        <div id="applyTokenStatus" class="summary sticky-summary hidden">
+          <div id="applyTokenStatusText"></div>
+        </div>
+
+        <div id="applyTokenCards" class="cards hidden"></div>
+      </div>
+
+      <div class="result" id="globalResult">
         <div class="result-title">Result</div>
         <div id="resultText">Выбери раздел выше, чтобы запустить проверку.</div>
       </div>
@@ -284,10 +389,23 @@
     <script>
       const homeView = document.getElementById("homeView");
       const scopeView = document.getElementById("scopeView");
+      const applyTokenView = document.getElementById("applyTokenView");
       const scopeCards = document.getElementById("scopeCards");
       const scopeSummary = document.getElementById("scopeSummary");
       const scopeSummaryText = document.getElementById("scopeSummaryText");
+      const applyTokenStatus = document.getElementById("applyTokenStatus");
+      const applyTokenStatusText = document.getElementById("applyTokenStatusText");
+      const applyTokenCards = document.getElementById("applyTokenCards");
+      const ignoredApplyTokenActions = document.getElementById("ignoredApplyTokenActions");
+      const toggleIgnoredApplyTokens = document.getElementById("toggleIgnoredApplyTokens");
+      const globalResult = document.getElementById("globalResult");
       const resultText = document.getElementById("resultText");
+      let brokenPathsExpanded = false;
+      let lastBrokenTokensResult = null;
+      let currentApplyTokenGroups = [];
+      let lastApplyTokenGroups = [];
+      let ignoredApplyTokenGroupIds = new Set();
+      let showIgnoredApplyTokenGroups = false;
 
       function debugLog(label, payload) {
         if (payload === undefined) {
@@ -320,12 +438,35 @@
         debugLog("showHome");
         homeView.classList.remove("hidden");
         scopeView.classList.add("hidden");
+        applyTokenView.classList.add("hidden");
+        globalResult.classList.remove("hidden");
       }
 
       function showScope() {
         debugLog("showScope");
         homeView.classList.add("hidden");
         scopeView.classList.remove("hidden");
+        applyTokenView.classList.add("hidden");
+        globalResult.classList.remove("hidden");
+      }
+
+      function showApplyToken() {
+        debugLog("showApplyToken");
+        homeView.classList.add("hidden");
+        scopeView.classList.add("hidden");
+        applyTokenView.classList.remove("hidden");
+        globalResult.classList.add("hidden");
+      }
+
+      function setApplyTokenStatus(text) {
+        if (!text) {
+          applyTokenStatus.classList.add("hidden");
+          applyTokenStatusText.textContent = "";
+          return;
+        }
+
+        applyTokenStatus.classList.remove("hidden");
+        applyTokenStatusText.textContent = text;
       }
 
       function getSummaryCounts() {
@@ -556,6 +697,298 @@
         debugLog("renderScopeCards listeners attached");
       }
 
+      function getSelectedCandidate(groupId) {
+        const select = document.getElementById(`token-select-${groupId}`);
+        return select ? select.value : "";
+      }
+
+      function getSelectedGroupMembers(groupId) {
+        return Array.from(document.querySelectorAll(`[data-case-group-id="${groupId}"]`))
+          .filter((input) => input.checked)
+          .map((input) => input.getAttribute("data-case-item-id"))
+          .filter(Boolean);
+      }
+
+      function updateGroupSelectionState(groupId) {
+        const group = currentApplyTokenGroups.find((entry) => entry.groupId === groupId);
+        if (!group) return;
+
+        const selectedIds = new Set(getSelectedGroupMembers(groupId));
+        const badge = document.getElementById(`apply-badge-${groupId}`);
+        const applyButton = document.querySelector(`[data-apply-token-group-id="${groupId}"]`);
+
+        if (badge) {
+          if (group.isResolved) {
+            badge.textContent = `Done ${selectedIds.size || group.members.length} cases`;
+            badge.className = "badge-done";
+          } else {
+            badge.textContent = `${selectedIds.size} cases`;
+            badge.className = "badge-review";
+          }
+        }
+
+        if (applyButton) {
+          applyButton.textContent = `Применить на ${selectedIds.size}`;
+        }
+
+        updateApplyTokenButtonState(groupId);
+      }
+
+      function updateApplyTokenButtonState(groupId) {
+        const group = currentApplyTokenGroups.find((entry) => entry.groupId === groupId);
+        if (!group) return;
+
+        const button = document.querySelector(`[data-apply-token-group-id="${groupId}"]`);
+        if (!button) return;
+
+        const selectedVariableId = getSelectedCandidate(groupId);
+        const selectedItemsCount = getSelectedGroupMembers(groupId).length;
+        const isSameAsApplied = !!group.appliedVariableId && group.appliedVariableId === selectedVariableId;
+
+        button.disabled = !selectedVariableId || isSameAsApplied || selectedItemsCount === 0;
+      }
+
+      function applyApplyTokenCardUpdate(groupId) {
+        const group = currentApplyTokenGroups.find((entry) => entry.groupId === groupId);
+        if (!group) return;
+
+        group.isResolved = true;
+        group.appliedVariableId = getSelectedCandidate(groupId);
+
+        const badge = document.getElementById(`apply-badge-${groupId}`);
+
+        if (badge) {
+          badge.textContent = `Done ${group.members.length} cases`;
+          badge.className = "badge-done";
+        }
+
+        updateApplyTokenButtonState(groupId);
+      }
+
+      function renderApplyTokenCards(groups) {
+        lastApplyTokenGroups = groups;
+        currentApplyTokenGroups = groups.filter((group) => {
+          if (showIgnoredApplyTokenGroups) {
+            return true;
+          }
+
+          return !ignoredApplyTokenGroupIds.has(group.groupId);
+        });
+        applyTokenCards.classList.remove("hidden");
+
+        const ignoredCount = groups.filter((group) => ignoredApplyTokenGroupIds.has(group.groupId)).length;
+        if (ignoredCount > 0) {
+          ignoredApplyTokenActions.classList.remove("hidden");
+          toggleIgnoredApplyTokens.textContent = showIgnoredApplyTokenGroups
+            ? `Скрыть скрытые (${ignoredCount})`
+            : `Показать скрытые (${ignoredCount})`;
+        } else {
+          ignoredApplyTokenActions.classList.add("hidden");
+        }
+
+        if (!currentApplyTokenGroups.length) {
+          applyTokenCards.innerHTML = `
+            <div class="card">
+              <div class="meta">На выбранном объекте не найдено значений без токенов.</div>
+            </div>
+          `;
+          return;
+        }
+
+        applyTokenCards.innerHTML = currentApplyTokenGroups.map((group) => {
+          const hasCandidates = group.candidates && group.candidates.length > 0;
+          const isSameAsApplied = !!group.appliedVariableId && group.appliedVariableId === group.selectedVariableId;
+          const options = hasCandidates
+            ? group.candidates.map((candidate) => {
+                const selected = candidate.id === group.selectedVariableId ? "selected" : "";
+                return `<option value="${candidate.id}" ${selected}>${escapeHtml(candidate.name)}</option>`;
+              }).join("")
+            : '<option value="">Подходящих токенов не найдено</option>';
+
+          const firstReason = hasCandidates && group.candidates[0] ? group.candidates[0].reason : "Нет подходящих токенов";
+          const previewPaths = (group.members || [])
+            .map((member) => `
+              <li class="case-item">
+                <input
+                  type="checkbox"
+                  class="case-checkbox"
+                  data-case-group-id="${group.groupId}"
+                  data-case-item-id="${member.itemId}"
+                  checked
+                />
+                <label class="case-label">${escapeHtml(member.nodePath)} / ${escapeHtml(member.propertyLabel || group.propertyLabel)}</label>
+              </li>
+            `)
+            .join("");
+
+          return `
+            <div class="card" id="apply-card-${group.groupId}">
+              <div class="token-head">
+                <div class="token-name">${escapeHtml(group.propertyLabel)}</div>
+                <div class="${hasCandidates ? "badge-review" : "badge-done"}" id="apply-badge-${group.groupId}">
+                  ${group.isResolved ? `Done ${group.members.length} cases` : hasCandidates ? `${group.members.length} cases` : "No match"}
+                </div>
+              </div>
+
+              <div class="meta">Value: ${escapeHtml(group.rawValueText)}</div>
+
+              <div class="card-body">
+                <div class="row">
+                  <div class="section-title">Примеры</div>
+                  <ul class="case-list">
+                    ${previewPaths}
+                  </ul>
+                </div>
+
+                <div class="row">
+                  <label for="token-select-${group.groupId}">Подходящий токен</label>
+                  <select id="token-select-${group.groupId}" ${hasCandidates ? "" : "disabled"}>
+                    ${options}
+                  </select>
+                </div>
+
+                <div class="hint">${escapeHtml(firstReason)}</div>
+
+                <div class="actions">
+                  <button class="primary-btn" data-apply-token-group-id="${group.groupId}" ${hasCandidates && !isSameAsApplied ? "" : "disabled"}>
+                    Применить на ${group.members.length}
+                  </button>
+                  <button class="secondary-btn" data-ignore-token-group-id="${group.groupId}">
+                    Игнорировать
+                  </button>
+                </div>
+              </div>
+            </div>
+          `;
+        }).join("");
+
+        document.querySelectorAll("[data-apply-token-group-id]").forEach((button) => {
+          button.addEventListener("click", () => {
+            const groupId = button.getAttribute("data-apply-token-group-id");
+            const group = currentApplyTokenGroups.find((entry) => entry.groupId === groupId);
+
+            if (!group) return;
+
+            const variableId = getSelectedCandidate(group.groupId);
+            if (!variableId) return;
+            const selectedItemIds = new Set(getSelectedGroupMembers(group.groupId));
+            if (!selectedItemIds.size) return;
+
+            parent.postMessage(
+              {
+                pluginMessage: {
+                  type: "apply-all-tokens",
+                  updates: group.members
+                    .filter((member) => selectedItemIds.has(member.itemId))
+                    .map((member) => ({
+                    groupId: group.groupId,
+                    itemId: member.itemId,
+                    nodeId: member.nodeId,
+                    variableId,
+                    target: member.target
+                    }))
+                }
+              },
+              "*"
+            );
+          });
+        });
+
+        document.querySelectorAll("[id^='token-select-group-'], [id^='token-select-']").forEach((select) => {
+          select.addEventListener("change", () => {
+            const groupId = select.id.replace("token-select-", "");
+            const group = currentApplyTokenGroups.find((entry) => entry.groupId === groupId);
+            if (!group) return;
+
+            group.selectedVariableId = select.value;
+            updateApplyTokenButtonState(groupId);
+          });
+        });
+
+        document.querySelectorAll("[data-case-group-id]").forEach((input) => {
+          input.addEventListener("change", () => {
+            const groupId = input.getAttribute("data-case-group-id");
+            if (!groupId) return;
+
+            updateGroupSelectionState(groupId);
+          });
+        });
+
+        document.querySelectorAll("[data-ignore-token-group-id]").forEach((button) => {
+          button.addEventListener("click", () => {
+            const groupId = button.getAttribute("data-ignore-token-group-id");
+            if (!groupId) return;
+
+            ignoredApplyTokenGroupIds.add(groupId);
+            renderApplyTokenCards(lastApplyTokenGroups);
+            setApplyTokenStatus("Кейс скрыт из текущего списка.");
+          });
+        });
+
+        currentApplyTokenGroups.forEach((group) => {
+          updateGroupSelectionState(group.groupId);
+        });
+      }
+
+      function escapeHtml(value) {
+        return String(value)
+          .replaceAll("&", "&amp;")
+          .replaceAll("<", "&lt;")
+          .replaceAll(">", "&gt;")
+          .replaceAll('"', "&quot;")
+          .replaceAll("'", "&#39;");
+      }
+
+      function renderBrokenTokensResult(data) {
+        lastBrokenTokensResult = data;
+
+        const details = Array.isArray(data.details) ? data.details : [];
+        const paths = Array.isArray(data.paths) ? data.paths : [];
+        const hasPaths = paths.length > 0;
+
+        const detailsHtml = details.length
+          ? `
+              <div class="result-block compact-block">
+                <div class="section-title">Детали</div>
+                <ul class="details-list">
+                  ${details.map((detail) => `<li>${escapeHtml(detail)}</li>`).join("")}
+                </ul>
+              </div>
+            `
+          : "";
+
+        const pathsHtml = hasPaths
+          ? `
+              <div class="result-block compact-block">
+                <div class="section-title">Сломанные токены</div>
+                <button id="toggleBrokenPaths" class="secondary-btn toggle-details">
+                  ${brokenPathsExpanded ? "Скрыть подробности" : "Показать подробности"}
+                </button>
+                <div class="details-panel ${brokenPathsExpanded ? "" : "hidden"}" id="brokenPathsPanel">
+                  <div class="section-title">Где найдено</div>
+                  <ul class="details-list">
+                    ${paths.map((path) => `<li>${escapeHtml(path)}</li>`).join("")}
+                  </ul>
+                </div>
+              </div>
+            `
+          : "";
+
+        resultText.innerHTML = `
+          <div class="summary-block">${escapeHtml(data.summary || "")}</div>
+          ${detailsHtml}
+          ${pathsHtml}
+        `;
+
+        const toggleButton = document.getElementById("toggleBrokenPaths");
+        if (toggleButton) {
+          toggleButton.addEventListener("click", () => {
+            brokenPathsExpanded = !brokenPathsExpanded;
+            renderBrokenTokensResult(lastBrokenTokensResult || data);
+          });
+        }
+      }
+
       document.querySelectorAll(".action-card").forEach((button) => {
         button.addEventListener("click", () => {
           const action = button.dataset.action;
@@ -564,6 +997,12 @@
           if (action === "scope-review") {
             showScope();
             resultText.textContent = "Открылся раздел Scope Review.";
+            return;
+          }
+
+          if (action === "raw-values") {
+            showApplyToken();
+            resultText.textContent = "Открылся раздел Apply Token.";
             return;
           }
 
@@ -579,6 +1018,26 @@
       document.getElementById("analyzeScopes").addEventListener("click", () => {
         debugLog("analyzeScopes click");
         parent.postMessage({ pluginMessage: { type: "run-scope-review" } }, "*");
+      });
+
+      document.getElementById("backToHomeFromApplyToken").addEventListener("click", () => {
+        debugLog("back from apply token click");
+        showHome();
+      });
+
+      document.getElementById("analyzeApplyTokens").addEventListener("click", () => {
+        debugLog("analyzeApplyTokens click");
+        parent.postMessage({ pluginMessage: { type: "run-apply-token-review" } }, "*");
+      });
+
+      toggleIgnoredApplyTokens.addEventListener("click", () => {
+        showIgnoredApplyTokenGroups = !showIgnoredApplyTokenGroups;
+        renderApplyTokenCards(lastApplyTokenGroups);
+        setApplyTokenStatus(
+          showIgnoredApplyTokenGroups
+            ? "Скрытые кейсы показаны."
+            : "Скрытые кейсы скрыты."
+        );
       });
 
       document.getElementById("applyAll").addEventListener("click", () => {
@@ -611,7 +1070,14 @@
         if (!msg) return;
 
         if (msg.type === "analysis-result") {
+          brokenPathsExpanded = false;
+          lastBrokenTokensResult = null;
           resultText.textContent = msg.text;
+        }
+
+        if (msg.type === "broken-tokens-result") {
+          brokenPathsExpanded = false;
+          renderBrokenTokensResult(msg);
         }
 
         if (msg.type === "scope-review-result") {
@@ -623,6 +1089,14 @@
           renderScopeCards(msg.items || []);
           resultText.textContent = "Проверка scope выполнена.";
           debugLog("scope-review-result done");
+        }
+
+        if (msg.type === "apply-token-review-result") {
+          showApplyToken();
+          ignoredApplyTokenGroupIds = new Set();
+          showIgnoredApplyTokenGroups = false;
+          setApplyTokenStatus("Проверка значений без токенов выполнена.");
+          renderApplyTokenCards(msg.groups || []);
         }
 
         if (msg.type === "apply-result") {
@@ -641,6 +1115,20 @@
 
           debugLog("apply-result done");
         }
+
+        if (msg.type === "apply-all-tokens-result") {
+          debugLog("apply-all-tokens-result start", msg);
+          setApplyTokenStatus(msg.text);
+
+          if (Array.isArray(msg.groupIds)) {
+            msg.groupIds.forEach((groupId) => {
+              applyApplyTokenCardUpdate(groupId);
+            });
+          }
+
+          debugLog("apply-all-tokens-result done");
+        }
+
       };
     </script>
   </body>
