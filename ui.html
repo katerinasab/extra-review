@@ -12,6 +12,7 @@
         --border: #eadfce;
         --success: #17824f;
         --warning: #9a6b16;
+        --danger: #c42a2a;
       }
 
       * {
@@ -25,7 +26,7 @@
         font-size: 12px;
         line-height: 1.4;
         color: var(--text);
-        background: linear-gradient(180deg, #f8f5ef 0%, #f2eee7 100%);
+        background: var(--bg);
       }
 
       .app {
@@ -42,6 +43,10 @@
         border: 1px solid var(--border);
         border-radius: 16px;
         padding: 14px;
+      }
+
+      .home-header {
+        padding: 4px 2px 2px;
       }
 
       h1 {
@@ -192,6 +197,119 @@
         color: var(--warning);
       }
 
+      .badge-legacy {
+        display: inline-flex;
+        align-items: center;
+        padding: 5px 9px;
+        border-radius: 999px;
+        font-size: 11px;
+        font-weight: 700;
+        background: rgba(196, 42, 42, 0.12);
+        color: var(--danger);
+        margin-top: 6px;
+      }
+
+      .chip-row {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 6px;
+        margin-top: 8px;
+      }
+
+      .chip-btn {
+        font-size: 11px;
+        padding: 6px 10px;
+        border-radius: 999px;
+        background: #e9e4db;
+        color: var(--text);
+        border: 1px solid transparent;
+      }
+
+      .chip-btn.is-selected {
+        background: rgba(23, 130, 79, 0.12);
+        border: 1px solid var(--success);
+        color: var(--success);
+      }
+
+      .fix-review-card {
+        border: 1px solid var(--border);
+        border-radius: 16px;
+        background: #ffffff;
+        padding: 14px;
+      }
+
+      .fix-review-card + .fix-review-card {
+        margin-top: 10px;
+      }
+
+      .fix-review-head {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+        gap: 10px;
+      }
+
+      .fix-review-name {
+        font-size: 13px;
+        font-weight: 700;
+        line-height: 1.35;
+        display: -webkit-box;
+        -webkit-line-clamp: 2;
+        -webkit-box-orient: vertical;
+        overflow: hidden;
+      }
+
+      .fix-review-status-icon {
+        flex-shrink: 0;
+        width: 20px;
+        height: 20px;
+      }
+
+      .fix-review-status-icon svg {
+        display: block;
+      }
+
+      .apply-chip-btn {
+        background: var(--success);
+        border: 1px solid var(--success);
+        color: #ffffff;
+        font-size: 12px;
+        font-weight: 700;
+        padding: 8px 14px;
+      }
+
+      .more-toggle-link {
+        background: transparent;
+        color: var(--muted);
+        text-decoration: underline;
+        font-size: 12px;
+        padding: 6px 2px;
+      }
+
+      .more-scopes-panel {
+        margin-top: 8px;
+        padding: 10px 12px;
+        border: 1px solid var(--border);
+        border-radius: 12px;
+        background: #faf7f1;
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+      }
+
+      .more-scopes-option {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        font-size: 12px;
+      }
+
+      .more-scopes-option input {
+        width: 16px;
+        height: 16px;
+        accent-color: var(--success);
+      }
+
       .collapsed .card-body {
         display: none;
       }
@@ -257,6 +375,13 @@
         background: #faf7f1;
       }
 
+      /* Each entry here is already its own bordered card, so this wrapper stays
+         unboxed — a border+background around a list of cards would just be a
+         redundant extra frame around frames. */
+      .review-list-panel {
+        margin-top: 8px;
+      }
+
       .summary-block {
         white-space: pre-wrap;
         font-size: 13px;
@@ -315,26 +440,15 @@
   <body>
     <div class="app">
       <div id="homeView">
-        <div class="hero">
+        <div class="home-header">
           <div class="section-title">Component Review</div>
           <h1>Extra Review</h1>
-          <p class="subtitle">Выбери, что именно хочешь проверить или исправить в компоненте.</p>
         </div>
 
         <div class="grid">
           <button class="action-card" data-action="broken-tokens">
             <span class="action-title">Проверить битые токены</span>
             <span class="action-desc">Найти удалённые или потерянные variable bindings у выбранного слоя.</span>
-          </button>
-
-          <button class="action-card" data-action="raw-values">
-            <span class="action-title">Применить токен</span>
-            <span class="action-desc">Найти значения без токенов и предложить подходящие токены.</span>
-          </button>
-
-          <button class="action-card" data-action="scope-review">
-            <span class="action-title">Определить scope</span>
-            <span class="action-desc">Проверить только локальные токены текущего файла.</span>
           </button>
 
           <button class="action-card" data-action="fix-scope">
@@ -345,6 +459,11 @@
           <button class="action-card" data-action="unused-tokens">
             <span class="action-title">Найти неиспользуемые токены</span>
             <span class="action-desc">Проверить выбранную коллекцию на неиспользуемые токены на странице.</span>
+          </button>
+
+          <button class="action-card" data-action="raw-values">
+            <span class="action-title">Применить токен</span>
+            <span class="action-desc">Найти значения без токенов и предложить подходящие токены.</span>
           </button>
         </div>
       </div>
@@ -389,9 +508,9 @@
         <div id="applyTokenCards" class="cards hidden"></div>
       </div>
 
-      <div class="result" id="globalResult">
+      <div class="result hidden" id="globalResult">
         <div class="result-title">Result</div>
-        <div id="resultText">Выбери раздел выше, чтобы запустить проверку.</div>
+        <div id="resultText"></div>
       </div>
     </div>
 
@@ -451,7 +570,6 @@
         homeView.classList.remove("hidden");
         scopeView.classList.add("hidden");
         applyTokenView.classList.add("hidden");
-        globalResult.classList.remove("hidden");
       }
 
       function showScope() {
@@ -657,6 +775,9 @@
             !item.isScopeMatched && item.confidence === "low"
               ? '<div class="hint confidence-hint">⚠️ Предложение неоднозначное (по статистике похожих токенов совпадает не всегда) — сверьте вручную перед применением.</div>'
               : "";
+          const legacyBadge = item.isLegacySizeStructure
+            ? '<div class="badge-legacy">Устаревшая структура имени (small/medium/large в пути)</div>'
+            : "";
 
           return `
             <div class="card ${collapsedClass}" id="card-${item.variableId}">
@@ -670,6 +791,7 @@
               <div class="meta" id="current-${item.variableId}">Current scope: ${escapeHtml(item.currentScopesText)}</div>
               <div class="meta">Suggested scope: ${escapeHtml(item.suggestedScopesText)}</div>
               ${confidenceHint}
+              ${legacyBadge}
 
               <div class="card-body">
                 <div class="scope-row">
@@ -1025,6 +1147,128 @@
         }
       }
 
+      function renderScopeFixChangeEntry(change) {
+        const legacyBadge = change.isLegacySizeStructure
+          ? '<span class="badge-legacy">legacy</span> '
+          : "";
+        return `<li>${legacyBadge}<strong>${escapeHtml(change.variableName)}</strong>: ${escapeHtml(change.fromScopesText)} → ${escapeHtml(change.toScopesText)}</li>`;
+      }
+
+      const ICON_INFO = `
+        <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <circle cx="10" cy="10" r="8.5" stroke="#9a6b16" stroke-width="1.4"/>
+          <rect x="9.15" y="8.4" width="1.7" height="5.6" rx="0.85" fill="#9a6b16"/>
+          <rect x="9.15" y="5.3" width="1.7" height="1.7" rx="0.85" fill="#9a6b16"/>
+        </svg>
+      `;
+      const ICON_APPLIED = `
+        <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <circle cx="10" cy="10" r="9" fill="#b9b2a4"/>
+          <path d="M6 10.2L8.6 12.8L14 7.2" stroke="white" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+      `;
+
+      function sameScopeArrays(a, b) {
+        if (a.length !== b.length) return false;
+        const left = [...a].sort();
+        const right = [...b].sort();
+        return left.every((value, index) => value === right[index]);
+      }
+
+      function findFixReviewEntry(variableId) {
+        if (!lastScopeFixResult || !Array.isArray(lastScopeFixResult.needsReview)) return null;
+        return lastScopeFixResult.needsReview.find((entry) => entry.variableId === variableId) || null;
+      }
+
+      function toggleFixReviewScope(variableId, scope, forceValue) {
+        const entry = findFixReviewEntry(variableId);
+        if (!entry) return;
+        if (!entry.selectedScopes) entry.selectedScopes = [];
+
+        const hasScope = entry.selectedScopes.includes(scope);
+        const shouldSelect = typeof forceValue === "boolean" ? forceValue : !hasScope;
+
+        if (shouldSelect && !hasScope) {
+          entry.selectedScopes.push(scope);
+        } else if (!shouldSelect && hasScope) {
+          entry.selectedScopes = entry.selectedScopes.filter((existing) => existing !== scope);
+        }
+
+        renderScopeFixResult(lastScopeFixResult);
+      }
+
+      function renderScopeFixReviewEntry(entry) {
+        if (!entry.selectedScopes) entry.selectedScopes = [];
+        if (entry.appliedScopes === undefined) entry.appliedScopes = null;
+        if (entry.moreExpanded === undefined) entry.moreExpanded = false;
+
+        const legacyBadge = entry.isLegacySizeStructure
+          ? '<div class="badge-legacy">Устаревшая структура имени (small/medium/large в пути)</div>'
+          : "";
+
+        const quickScopes = Array.isArray(entry.quickScopes) ? entry.quickScopes : [];
+        const allowedScopes = Array.isArray(entry.allowedScopes) ? entry.allowedScopes : [];
+
+        // Chips and the full checklist are two views of the same choice — show only one
+        // at a time instead of both.
+        const optionsHtml = entry.moreExpanded
+          ? `
+              <div class="more-scopes-panel">
+                ${allowedScopes
+                  .map((scope) => {
+                    const checked = entry.selectedScopes.includes(scope);
+                    return `
+                      <label class="more-scopes-option">
+                        <input type="checkbox" data-fix-scope-checkbox="${entry.variableId}" data-scope="${scope}" ${checked ? "checked" : ""} />
+                        ${escapeHtml(scope)}
+                      </label>
+                    `;
+                  })
+                  .join("")}
+                <button type="button" class="more-toggle-link" data-fix-more-toggle="${entry.variableId}">скрыть</button>
+              </div>
+            `
+          : `
+              <div class="chip-row">
+                ${quickScopes
+                  .map((scope) => {
+                    const selected = entry.selectedScopes.includes(scope);
+                    return `
+                      <button
+                        type="button"
+                        class="chip-btn ${selected ? "is-selected" : ""}"
+                        data-fix-scope-toggle="${entry.variableId}"
+                        data-scope="${scope}"
+                      >${escapeHtml(scope)}</button>
+                    `;
+                  })
+                  .join("")}
+                <button type="button" class="more-toggle-link" data-fix-more-toggle="${entry.variableId}">more...</button>
+              </div>
+            `;
+
+        const hasSelection = entry.selectedScopes.length > 0;
+        const isDirty = !entry.appliedScopes || !sameScopeArrays(entry.selectedScopes, entry.appliedScopes);
+        const showApply = hasSelection && isDirty;
+
+        return `
+          <li class="fix-review-card" id="fix-review-${entry.variableId}">
+            <div class="fix-review-head">
+              <div class="fix-review-name">${escapeHtml(entry.variableName)}</div>
+              <div class="fix-review-status-icon">${entry.appliedScopes ? ICON_APPLIED : ICON_INFO}</div>
+            </div>
+            <div class="meta">Current: ${escapeHtml(entry.currentScopesText)}</div>
+            ${legacyBadge}
+            ${optionsHtml}
+            ${
+              showApply
+                ? `<div class="actions"><button type="button" class="apply-chip-btn" data-fix-apply="${entry.variableId}">Apply</button></div>`
+                : ""
+            }
+          </li>
+        `;
+      }
+
       function renderScopeFixResult(data) {
         lastScopeFixResult = data;
 
@@ -1040,7 +1284,7 @@
                 </button>
                 <div class="details-panel ${scopeFixChangesExpanded ? "" : "hidden"}" id="scopeFixChangesPanel">
                   <ul class="details-list">
-                    ${changes.map((change) => `<li><strong>${escapeHtml(change.variableName)}</strong>: ${escapeHtml(change.fromScopesText)} → ${escapeHtml(change.toScopesText)}</li>`).join("")}
+                    ${changes.map(renderScopeFixChangeEntry).join("")}
                   </ul>
                 </div>
               </div>
@@ -1054,11 +1298,10 @@
                 <button id="toggleScopeFixReview" class="secondary-btn toggle-details">
                   ${scopeFixReviewExpanded ? "Скрыть список" : "Показать список"}
                 </button>
-                <div class="details-panel ${scopeFixReviewExpanded ? "" : "hidden"}" id="scopeFixReviewPanel">
-                  <ul class="details-list">
-                    ${needsReview.map((entry) => `<li><strong>${escapeHtml(entry.variableName)}</strong>: ${escapeHtml(entry.currentScopesText)} → предложение: ${escapeHtml(entry.suggestedScopesText)}</li>`).join("")}
+                <div class="review-list-panel ${scopeFixReviewExpanded ? "" : "hidden"}" id="scopeFixReviewPanel">
+                  <ul class="case-list">
+                    ${needsReview.map(renderScopeFixReviewEntry).join("")}
                   </ul>
-                  <div class="hint">Предложение неоднозначно по статистике — проверьте эти токены вручную в разделе «Определить scope».</div>
                 </div>
               </div>
             `
@@ -1085,18 +1328,68 @@
             renderScopeFixResult(lastScopeFixResult || data);
           });
         }
+
+        document.querySelectorAll("[data-fix-scope-toggle]").forEach((button) => {
+          button.addEventListener("click", () => {
+            const variableId = button.getAttribute("data-fix-scope-toggle");
+            const scope = button.getAttribute("data-scope");
+            if (!variableId || !scope) return;
+            toggleFixReviewScope(variableId, scope);
+          });
+        });
+
+        document.querySelectorAll("[data-fix-scope-checkbox]").forEach((checkbox) => {
+          checkbox.addEventListener("change", () => {
+            const variableId = checkbox.getAttribute("data-fix-scope-checkbox");
+            const scope = checkbox.getAttribute("data-scope");
+            if (!variableId || !scope) return;
+            toggleFixReviewScope(variableId, scope, checkbox.checked);
+          });
+        });
+
+        document.querySelectorAll("[data-fix-more-toggle]").forEach((button) => {
+          button.addEventListener("click", () => {
+            const variableId = button.getAttribute("data-fix-more-toggle");
+            const entry = findFixReviewEntry(variableId);
+            if (!entry) return;
+            entry.moreExpanded = !entry.moreExpanded;
+            renderScopeFixResult(lastScopeFixResult);
+          });
+        });
+
+        document.querySelectorAll("[data-fix-apply]").forEach((button) => {
+          button.addEventListener("click", () => {
+            const variableId = button.getAttribute("data-fix-apply");
+            const entry = findFixReviewEntry(variableId);
+            if (!entry || !entry.selectedScopes.length) return;
+
+            parent.postMessage(
+              {
+                pluginMessage: {
+                  type: "apply-scope",
+                  variableId,
+                  scopes: entry.selectedScopes
+                }
+              },
+              "*"
+            );
+          });
+        });
+      }
+
+      function markScopeFixReviewResolved(variableId, scopes) {
+        const entry = findFixReviewEntry(variableId);
+        if (!entry) return;
+
+        entry.appliedScopes = [...scopes];
+        entry.selectedScopes = [...scopes];
+        renderScopeFixResult(lastScopeFixResult);
       }
 
       document.querySelectorAll(".action-card").forEach((button) => {
         button.addEventListener("click", () => {
           const action = button.dataset.action;
           debugLog("home action click", { action });
-
-          if (action === "scope-review") {
-            showScope();
-            resultText.textContent = "Открылся раздел Scope Review.";
-            return;
-          }
 
           if (action === "raw-values") {
             showApplyToken();
@@ -1106,6 +1399,7 @@
 
           if (action === "fix-scope") {
             showHome();
+            globalResult.classList.remove("hidden");
             resultText.textContent = "Проверяю и исправляю scope у локальных токенов файла…";
             parent.postMessage({ pluginMessage: { type: "run-fix-scope" } }, "*");
             return;
@@ -1177,16 +1471,19 @@
         if (msg.type === "analysis-result") {
           brokenPathsExpanded = false;
           lastBrokenTokensResult = null;
+          globalResult.classList.remove("hidden");
           resultText.textContent = msg.text;
         }
 
         if (msg.type === "broken-tokens-result") {
           brokenPathsExpanded = false;
+          globalResult.classList.remove("hidden");
           renderBrokenTokensResult(msg);
         }
 
         if (msg.type === "scope-fix-result") {
           showHome();
+          globalResult.classList.remove("hidden");
           scopeFixChangesExpanded = false;
           scopeFixReviewExpanded = false;
           renderScopeFixResult(msg);
@@ -1217,11 +1514,13 @@
 
           if (msg.variableId && Array.isArray(msg.scopes)) {
             applyCardUpdate(msg.variableId, msg.scopes);
+            markScopeFixReviewResolved(msg.variableId, msg.scopes);
           }
 
           if (Array.isArray(msg.updates)) {
             msg.updates.forEach((update) => {
               applyCardUpdate(update.variableId, update.scopes);
+              markScopeFixReviewResolved(update.variableId, update.scopes);
             });
           }
 

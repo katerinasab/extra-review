@@ -986,10 +986,16 @@ function getAllowedScopesByType(type) {
             return ["ALL_SCOPES"];
     }
 }
+// The team prefers to never fall back to ALL_SCOPES as a *guess* — an unrecognized
+// pattern should surface as "no suggestion" (leave the current scope alone) rather than
+// push a maximally-permissive scope. The only confirmed real use of ALL_SCOPES is
+// icon/chevron's own "size" token (handled as its own case below) and the composite
+// box-shadow value (not a per-field bindable property).
+const NO_SUGGESTION = { scopes: [], confidence: "low" };
 // "high" = matches a naming pattern that is unambiguous in >=90% of real tokens.
 // "low" = the keyword exists but real usage is genuinely mixed (e.g. "trigger" is only
-// 55% one scope combo, "indicator" splits three ways) — worth suggesting, not worth
-// auto-applying without a human look.
+// 55% one scope combo, "indicator" splits several ways) — worth suggesting a few ranked
+// options, not worth auto-applying without a human look.
 const FLOAT_SCOPE_RULES = [
     { match: (s) => s.indexOf("radius") !== -1, scopes: ["CORNER_RADIUS"], confidence: "high" },
     { match: (s) => s === "border-width", scopes: ["STROKE_FLOAT"], confidence: "high" },
@@ -1000,7 +1006,9 @@ const FLOAT_SCOPE_RULES = [
     { match: (s) => s === "letter-spacing", scopes: ["LETTER_SPACING"], confidence: "high" },
     { match: (s) => s === "opacity", scopes: ["OPACITY"], confidence: "high" },
     {
-        match: (s) => s === "horizontal" || s === "vertical" || s === "gap" || s === "spacing",
+        // "horizontal"/"vertical" with any suffix (horizontal-start, horizontal-lw, vertical-end, …)
+        // is still GAP.
+        match: (s) => s.indexOf("horizontal") === 0 || s.indexOf("vertical") === 0 || s === "gap" || s === "spacing",
         scopes: ["GAP"],
         confidence: "high"
     },
@@ -1022,8 +1030,13 @@ const STRING_SCOPE_RULES = [
 // Checked first, as exact segment matches only (avoids e.g. "button-text" or
 // "text-input" component-name segments being mistaken for a "text" layer).
 const COLOR_SCOPE_RULES_EXACT = [
-    { match: (s) => s === "title" || s === "subtitle" || s === "text", scopes: ["TEXT_FILL"], confidence: "high" },
+    {
+        match: (s) => s === "title" || s === "subtitle" || s === "text" || s === "description",
+        scopes: ["TEXT_FILL"],
+        confidence: "high"
+    },
     { match: (s) => s === "border", scopes: ["STROKE_COLOR"], confidence: "high" },
+    { match: (s) => s === "line", scopes: ["SHAPE_FILL", "STROKE_COLOR"], confidence: "high" },
     {
         match: (s) => s === "track" || s === "selector",
         scopes: ["FRAME_FILL", "SHAPE_FILL", "STROKE_COLOR"],
@@ -1033,11 +1046,33 @@ const COLOR_SCOPE_RULES_EXACT = [
     { match: (s) => s === "content", scopes: ["SHAPE_FILL", "TEXT_FILL"], confidence: "high" },
     { match: (s) => s === "icon" || s === "chevron", scopes: ["SHAPE_FILL"], confidence: "high" },
     {
-        match: (s) => s === "trigger" || s === "indicator",
+        match: (s) => s === "trigger",
         scopes: ["FRAME_FILL", "SHAPE_FILL", "STROKE_COLOR"],
-        confidence: "low"
+        confidence: "low",
+        alternatives: [["FRAME_FILL", "SHAPE_FILL", "STROKE_COLOR"], ["SHAPE_FILL"], ["FRAME_FILL"]]
     },
-    { match: (s) => s === "separator", scopes: ["SHAPE_FILL", "STROKE_COLOR"], confidence: "low" }
+    {
+        match: (s) => s === "indicator",
+        scopes: ["FRAME_FILL", "SHAPE_FILL", "STROKE_COLOR"],
+        confidence: "low",
+        alternatives: [
+            ["FRAME_FILL", "SHAPE_FILL", "STROKE_COLOR"],
+            ["FRAME_FILL", "SHAPE_FILL"],
+            ["SHAPE_FILL", "TEXT_FILL"],
+            ["TEXT_FILL"]
+        ]
+    },
+    {
+        match: (s) => s === "separator",
+        scopes: ["SHAPE_FILL", "STROKE_COLOR"],
+        confidence: "low",
+        alternatives: [
+            ["SHAPE_FILL", "STROKE_COLOR"],
+            ["SHAPE_FILL"],
+            ["FRAME_FILL", "SHAPE_FILL", "STROKE_COLOR"],
+            ["FRAME_FILL", "SHAPE_FILL"]
+        ]
+    }
 ];
 // Fallback pass, only run when nothing matched exactly: catches compound segments like
 // "start-icon"/"end-icon" (contain "icon") or "validation-text" (contains "text").
@@ -1046,6 +1081,16 @@ const COLOR_SCOPE_RULES_CONTAINS = [
     { match: (s) => s.indexOf("text") !== -1, scopes: ["TEXT_FILL"], confidence: "high" },
     { match: (s) => s.indexOf("border") !== -1, scopes: ["STROKE_COLOR"], confidence: "high" }
 ];
+// Legacy WPF token names sometimes bake the size mode straight into the path
+// ("…/medium", "…/small") instead of using the size collection/mode. The current
+// convention keeps size out of the name entirely, so seeing one of these as its own
+// segment means the token still uses the old per-component structure.
+const LEGACY_SIZE_SEGMENTS = ["small", "medium", "large"];
+function isLegacySizeStructure(segments) {
+    return segments.some(function (segment) {
+        return LEGACY_SIZE_SEGMENTS.indexOf(segment) !== -1;
+    });
+}
 function getVariableNameSegments(name) {
     return name
         .toLowerCase()
@@ -1059,7 +1104,7 @@ function findScopeFromSegments(segments, rules) {
     for (let i = segments.length - 1; i >= 0; i--) {
         for (const rule of rules) {
             if (rule.match(segments[i])) {
-                return { scopes: rule.scopes, confidence: rule.confidence };
+                return { scopes: rule.scopes, confidence: rule.confidence, alternatives: rule.alternatives };
             }
         }
     }
@@ -1080,21 +1125,31 @@ function suggestScopesFromName(variable) {
         }
     }
     // Icon/chevron's own size token is real-world scoped ALL_SCOPES, not WIDTH_HEIGHT —
-    // unlike "layout/.../size" tokens, which are WIDTH_HEIGHT.
+    // unlike "layout/.../size" tokens, which are WIDTH_HEIGHT. This is the one confirmed
+    // legitimate use of ALL_SCOPES as a suggestion.
     if (leaf === "size" && (segments.indexOf("icon") !== -1 || segments.indexOf("chevron") !== -1)) {
         return { scopes: ["ALL_SCOPES"], confidence: "high" };
     }
     if (variable.resolvedType === "FLOAT") {
-        return findScopeFromSegments(segments, FLOAT_SCOPE_RULES) || { scopes: ["ALL_SCOPES"], confidence: "low" };
+        const found = findScopeFromSegments(segments, FLOAT_SCOPE_RULES);
+        if (found)
+            return found;
+        // Focus-rect layout tokens ("offset", "outer-box", …) represent the ring's spacing,
+        // not a literal box size — treat any of them as GAP.
+        if (segments.indexOf("focus-rect") !== -1) {
+            return { scopes: ["GAP"], confidence: "high" };
+        }
+        return NO_SUGGESTION;
     }
     if (variable.resolvedType === "STRING") {
-        return findScopeFromSegments(segments, STRING_SCOPE_RULES) || { scopes: ["ALL_SCOPES"], confidence: "low" };
+        return findScopeFromSegments(segments, STRING_SCOPE_RULES) || NO_SUGGESTION;
     }
     if (variable.resolvedType === "COLOR") {
         return (findScopeFromSegments(segments, COLOR_SCOPE_RULES_EXACT) ||
-            findScopeFromSegments(segments, COLOR_SCOPE_RULES_CONTAINS) || { scopes: ["ALL_SCOPES"], confidence: "low" });
+            findScopeFromSegments(segments, COLOR_SCOPE_RULES_CONTAINS) ||
+            NO_SUGGESTION);
     }
-    return { scopes: ["ALL_SCOPES"], confidence: "low" };
+    return NO_SUGGESTION;
 }
 function sameScopes(a, b) {
     if (a.length !== b.length)
@@ -1103,6 +1158,43 @@ function sameScopes(a, b) {
     const right = b.slice().sort();
     return left.every(function (value, index) {
         return value === right[index];
+    });
+}
+function isScopeUnset(scopes) {
+    return scopes.length === 0 || (scopes.length === 1 && scopes[0] === "ALL_SCOPES");
+}
+// A variable's current scope can legitimately be *broader* than what its own name
+// suggests — the same token is sometimes reused across several unrelated bindable
+// properties (e.g. one shared "medium" spacing value bound to a gap, a corner-radius,
+// and a width in different components). Narrowing that down based on name alone would
+// break those other bindings, so treat "current already covers what we'd suggest" as
+// fine, not a mismatch.
+function isCurrentScopeCompatible(currentScopes, suggestedScopes) {
+    if (!currentScopes.length)
+        return false;
+    return suggestedScopes.every(function (scope) {
+        return currentScopes.indexOf(scope) !== -1;
+    });
+}
+// Turns a list of candidate scope *combinations* (ranked, most-likely first) into a
+// ranked list of individual scopes, for use as quick-pick chips. Earlier combos count
+// for more, so a scope that shows up in the top combo outweighs one that only appears
+// further down the list.
+function rankIndividualScopes(alternatives, take) {
+    const weightByScope = new Map();
+    alternatives.forEach(function (combo, index) {
+        const comboWeight = alternatives.length - index;
+        combo.forEach(function (scope) {
+            weightByScope.set(scope, (weightByScope.get(scope) || 0) + comboWeight);
+        });
+    });
+    return Array.from(weightByScope.entries())
+        .sort(function (a, b) {
+        return b[1] - a[1];
+    })
+        .slice(0, take)
+        .map(function (entry) {
+        return entry[0];
     });
 }
 async function buildScopeReview() {
@@ -1140,7 +1232,9 @@ async function buildScopeReview() {
             : currentScopes.length > 0
                 ? currentScopes.slice(0, 3)
                 : ["ALL_SCOPES"];
-        const isScopeMatched = suggestedScopes.length > 0 ? sameScopes(currentScopes, suggestedScopes) : currentScopes.length > 0;
+        const isScopeMatched = suggestedScopes.length > 0
+            ? isCurrentScopeCompatible(currentScopes, suggestedScopes)
+            : currentScopes.length > 0;
         items.push({
             variableId: variable.id,
             variableName: variable.name,
@@ -1150,7 +1244,8 @@ async function buildScopeReview() {
             selectedScopes: selectedScopes,
             allowedScopes: allowedScopes,
             isScopeMatched: isScopeMatched,
-            confidence: suggestion.confidence
+            confidence: suggestion.confidence,
+            isLegacySizeStructure: isLegacySizeStructure(getVariableNameSegments(variable.name))
         });
     }
     const sortedItems = items.sort(function (a, b) {
@@ -1192,6 +1287,7 @@ async function buildAndApplyScopeFix() {
     });
     const changes = [];
     const needsReview = [];
+    let legacySizeCount = 0;
     for (const variable of localVariables) {
         const allowedScopes = getAllowedScopesByType(variable.resolvedType);
         const suggestion = suggestScopesFromName(variable);
@@ -1201,26 +1297,39 @@ async function buildAndApplyScopeFix() {
         const currentScopes = variable.scopes.filter(function (scope) {
             return allowedScopes.includes(scope);
         });
-        if (!suggestedScopes.length || sameScopes(currentScopes, suggestedScopes)) {
+        const segments = getVariableNameSegments(variable.name);
+        const isLegacySize = isLegacySizeStructure(segments);
+        if (isLegacySize) {
+            legacySizeCount += 1;
+        }
+        if (!suggestedScopes.length || isCurrentScopeCompatible(currentScopes, suggestedScopes)) {
             continue;
         }
         const currentScopesText = currentScopes.length ? currentScopes.join(", ") : "No scopes set";
         const suggestedScopesText = suggestedScopes.join(", ");
-        if (suggestion.confidence === "high") {
+        // Only auto-apply when nothing meaningful was set before (empty or ALL_SCOPES) —
+        // a variable that already has a specific, different scope may be intentionally
+        // shared across several bindable properties, so overwriting it needs a human look
+        // even when our own suggestion is normally high-confidence.
+        if (suggestion.confidence === "high" && isScopeUnset(currentScopes)) {
             variable.scopes = suggestedScopes;
             changes.push({
                 variableId: variable.id,
                 variableName: variable.name,
                 fromScopesText: currentScopesText,
-                toScopesText: suggestedScopesText
+                toScopesText: suggestedScopesText,
+                isLegacySizeStructure: isLegacySize
             });
         }
         else {
+            const alternatives = suggestion.alternatives || [suggestedScopes];
             needsReview.push({
                 variableId: variable.id,
                 variableName: variable.name,
                 currentScopesText: currentScopesText,
-                suggestedScopesText: suggestedScopesText
+                quickScopes: rankIndividualScopes(alternatives, 2),
+                allowedScopes: allowedScopes,
+                isLegacySizeStructure: isLegacySize
             });
         }
     }
@@ -1233,6 +1342,7 @@ async function buildAndApplyScopeFix() {
     const summary = "Проверено локальных токенов: " + localVariables.length + "\n" +
         "Исправлено автоматически: " + sortedChanges.length + "\n" +
         "Требуют ручной проверки: " + sortedNeedsReview.length +
+        (legacySizeCount > 0 ? "\nУстаревшая структура имени (small/medium/large в пути): " + legacySizeCount : "") +
         (sortedChanges.length === 0 && sortedNeedsReview.length === 0
             ? "\n\nВсе scope уже соответствуют паттернам именования."
             : "");
