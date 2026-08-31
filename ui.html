@@ -204,9 +204,13 @@
       }
 
       .scope-row {
-        display: grid;
-        grid-template-columns: 1fr 1fr;
+        display: flex;
+        flex-direction: column;
         gap: 8px;
+      }
+
+      .confidence-hint {
+        margin-top: 4px;
       }
 
       select {
@@ -333,6 +337,11 @@
             <span class="action-desc">Проверить только локальные токены текущего файла.</span>
           </button>
 
+          <button class="action-card" data-action="fix-scope">
+            <span class="action-title">Поправить scope</span>
+            <span class="action-desc">Одной кнопкой исправить очевидные несовпадения scope во всех локальных токенах файла и показать список изменений.</span>
+          </button>
+
           <button class="action-card" data-action="unused-tokens">
             <span class="action-title">Найти неиспользуемые токены</span>
             <span class="action-desc">Проверить выбранную коллекцию на неиспользуемые токены на странице.</span>
@@ -406,6 +415,9 @@
       let lastApplyTokenGroups = [];
       let ignoredApplyTokenGroupIds = new Set();
       let showIgnoredApplyTokenGroups = false;
+      let lastScopeFixResult = null;
+      let scopeFixChangesExpanded = false;
+      let scopeFixReviewExpanded = false;
 
       function debugLog(label, payload) {
         if (payload === undefined) {
@@ -568,14 +580,16 @@
 
         const select1 = document.getElementById(`scope1-${variableId}`);
         const select2 = document.getElementById(`scope2-${variableId}`);
+        const select3 = document.getElementById(`scope3-${variableId}`);
 
         debugLog("getSelectedScopes refs", {
           variableId,
           hasSelect1: !!select1,
-          hasSelect2: !!select2
+          hasSelect2: !!select2,
+          hasSelect3: !!select3
         });
 
-        const values = [select1?.value || "", select2?.value || ""]
+        const values = [select1?.value || "", select2?.value || "", select3?.value || ""]
           .filter((value) => value && value !== "NONE");
 
         const result = [...new Set(values)];
@@ -628,19 +642,34 @@
 
           debugLog("second select built", { variableId: item.variableId });
 
+          const thirdOptions = [
+            '<option value="NONE">—</option>',
+            ...item.allowedScopes.map((scope) => {
+              const thirdSelected = item.selectedScopes[2] === scope ? "selected" : "";
+              return `<option value="${scope}" ${thirdSelected}>${scope}</option>`;
+            })
+          ].join("");
+
+          debugLog("third select built", { variableId: item.variableId });
+
           const collapsedClass = item.isScopeMatched ? "collapsed" : "";
+          const confidenceHint =
+            !item.isScopeMatched && item.confidence === "low"
+              ? '<div class="hint confidence-hint">⚠️ Предложение неоднозначное (по статистике похожих токенов совпадает не всегда) — сверьте вручную перед применением.</div>'
+              : "";
 
           return `
             <div class="card ${collapsedClass}" id="card-${item.variableId}">
               <div class="token-head">
-                <div class="token-name">${item.variableName}</div>
+                <div class="token-name">${escapeHtml(item.variableName)}</div>
                 <div class="${item.isScopeMatched ? "badge-done" : "badge-review"}" id="badge-${item.variableId}">
                   ${item.isScopeMatched ? "Done" : "Need review"}
                 </div>
               </div>
 
-              <div class="meta" id="current-${item.variableId}">Current scope: ${item.currentScopesText}</div>
-              <div class="meta">Suggested scope: ${item.suggestedScopesText}</div>
+              <div class="meta" id="current-${item.variableId}">Current scope: ${escapeHtml(item.currentScopesText)}</div>
+              <div class="meta">Suggested scope: ${escapeHtml(item.suggestedScopesText)}</div>
+              ${confidenceHint}
 
               <div class="card-body">
                 <div class="scope-row">
@@ -657,9 +686,16 @@
                       ${secondOptions}
                     </select>
                   </div>
+
+                  <div class="row">
+                    <label for="scope3-${item.variableId}">Scope 3</label>
+                    <select id="scope3-${item.variableId}">
+                      ${thirdOptions}
+                    </select>
+                  </div>
                 </div>
 
-                <div class="hint">Во втором поле можно оставить прочерк, если нужен только один scope.</div>
+                <div class="hint">Во втором и третьем поле можно оставить прочерк, если scope'ов нужно меньше.</div>
 
                 <div class="actions">
                   <button class="primary-btn" data-apply-id="${item.variableId}">Apply</button>
@@ -989,6 +1025,68 @@
         }
       }
 
+      function renderScopeFixResult(data) {
+        lastScopeFixResult = data;
+
+        const changes = Array.isArray(data.changes) ? data.changes : [];
+        const needsReview = Array.isArray(data.needsReview) ? data.needsReview : [];
+
+        const changesHtml = changes.length
+          ? `
+              <div class="result-block compact-block">
+                <div class="section-title">Исправлено автоматически (${changes.length})</div>
+                <button id="toggleScopeFixChanges" class="secondary-btn toggle-details">
+                  ${scopeFixChangesExpanded ? "Скрыть список" : "Показать список"}
+                </button>
+                <div class="details-panel ${scopeFixChangesExpanded ? "" : "hidden"}" id="scopeFixChangesPanel">
+                  <ul class="details-list">
+                    ${changes.map((change) => `<li><strong>${escapeHtml(change.variableName)}</strong>: ${escapeHtml(change.fromScopesText)} → ${escapeHtml(change.toScopesText)}</li>`).join("")}
+                  </ul>
+                </div>
+              </div>
+            `
+          : "";
+
+        const needsReviewHtml = needsReview.length
+          ? `
+              <div class="result-block compact-block">
+                <div class="section-title">Нужна ручная проверка (${needsReview.length})</div>
+                <button id="toggleScopeFixReview" class="secondary-btn toggle-details">
+                  ${scopeFixReviewExpanded ? "Скрыть список" : "Показать список"}
+                </button>
+                <div class="details-panel ${scopeFixReviewExpanded ? "" : "hidden"}" id="scopeFixReviewPanel">
+                  <ul class="details-list">
+                    ${needsReview.map((entry) => `<li><strong>${escapeHtml(entry.variableName)}</strong>: ${escapeHtml(entry.currentScopesText)} → предложение: ${escapeHtml(entry.suggestedScopesText)}</li>`).join("")}
+                  </ul>
+                  <div class="hint">Предложение неоднозначно по статистике — проверьте эти токены вручную в разделе «Определить scope».</div>
+                </div>
+              </div>
+            `
+          : "";
+
+        resultText.innerHTML = `
+          <div class="summary-block">${escapeHtml(data.summary || "")}</div>
+          ${changesHtml}
+          ${needsReviewHtml}
+        `;
+
+        const toggleChangesButton = document.getElementById("toggleScopeFixChanges");
+        if (toggleChangesButton) {
+          toggleChangesButton.addEventListener("click", () => {
+            scopeFixChangesExpanded = !scopeFixChangesExpanded;
+            renderScopeFixResult(lastScopeFixResult || data);
+          });
+        }
+
+        const toggleReviewButton = document.getElementById("toggleScopeFixReview");
+        if (toggleReviewButton) {
+          toggleReviewButton.addEventListener("click", () => {
+            scopeFixReviewExpanded = !scopeFixReviewExpanded;
+            renderScopeFixResult(lastScopeFixResult || data);
+          });
+        }
+      }
+
       document.querySelectorAll(".action-card").forEach((button) => {
         button.addEventListener("click", () => {
           const action = button.dataset.action;
@@ -1003,6 +1101,13 @@
           if (action === "raw-values") {
             showApplyToken();
             resultText.textContent = "Открылся раздел Apply Token.";
+            return;
+          }
+
+          if (action === "fix-scope") {
+            showHome();
+            resultText.textContent = "Проверяю и исправляю scope у локальных токенов файла…";
+            parent.postMessage({ pluginMessage: { type: "run-fix-scope" } }, "*");
             return;
           }
 
@@ -1078,6 +1183,13 @@
         if (msg.type === "broken-tokens-result") {
           brokenPathsExpanded = false;
           renderBrokenTokensResult(msg);
+        }
+
+        if (msg.type === "scope-fix-result") {
+          showHome();
+          scopeFixChangesExpanded = false;
+          scopeFixReviewExpanded = false;
+          renderScopeFixResult(msg);
         }
 
         if (msg.type === "scope-review-result") {

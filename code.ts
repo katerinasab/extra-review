@@ -3,6 +3,7 @@ figma.showUI(__html__, { width: 460, height: 760 });
 type PluginMessage =
   | { type: "run-check"; action: string }
   | { type: "run-scope-review" }
+  | { type: "run-fix-scope" }
   | { type: "run-apply-token-review" }
   | { type: "apply-scope"; variableId: string; scopes: VariableScope[] }
   | { type: "apply-all-scopes"; updates: Array<{ variableId: string; scopes: VariableScope[] }> }
@@ -42,6 +43,27 @@ type ScopeReviewItem = {
   selectedScopes: VariableScope[];
   allowedScopes: VariableScope[];
   isScopeMatched: boolean;
+  confidence: "high" | "low";
+};
+
+type ScopeFixChange = {
+  variableId: string;
+  variableName: string;
+  fromScopesText: string;
+  toScopesText: string;
+};
+
+type ScopeFixReviewEntry = {
+  variableId: string;
+  variableName: string;
+  currentScopesText: string;
+  suggestedScopesText: string;
+};
+
+type ScopeFixResult = {
+  summary: string;
+  changes: ScopeFixChange[];
+  needsReview: ScopeFixReviewEntry[];
 };
 
 type BrokenTokensResult = {
@@ -131,6 +153,15 @@ function postScopeReview(items: ScopeReviewItem[], summary: string) {
     type: "scope-review-result",
     items: items,
     summary: summary
+  });
+}
+
+function postScopeFixResult(result: ScopeFixResult) {
+  figma.ui.postMessage({
+    type: "scope-fix-result",
+    summary: result.summary,
+    changes: result.changes,
+    needsReview: result.needsReview
   });
 }
 
@@ -1400,60 +1431,155 @@ function getAllowedScopesByType(type: VariableResolvedDataType): VariableScope[]
   }
 }
 
-function inferScopesFromName(variable: Variable): VariableScope[] {
-  const name = variable.name.toLowerCase();
+// The rules below were derived by statistically analyzing ~7300 real design tokens
+// (tokens/components/**/*.json in the design-tokens repo, incl. the WPF component
+// library) and their existing `$extensions["com.figma.scopes"]` values, grouped by
+// the naming-convention "layer"/"parameter" segment documented in
+// tokens/components/README.md. Matching walks name segments (split by "/") from the
+// leaf backwards, so an earlier segment that happens to contain a role word (e.g. the
+// mode segment in "button/color/text/primary/bg/rest", or the component name in
+// "text-input/color/default/border/rest") never shadows the real layer segment closer
+// to the leaf.
+type ScopeConfidence = "high" | "low";
 
-  if (name.includes("border-radius") || name.includes("radius")) return ["CORNER_RADIUS"];
+type ScopeSuggestion = {
+  scopes: VariableScope[];
+  confidence: ScopeConfidence;
+};
 
-  if (
-    name.includes("min-height") ||
-    name.includes("min-width") ||
-    name.includes("/width/") ||
-    name.includes("/height/")
-  ) {
-    return ["WIDTH_HEIGHT"];
+type ScopeSegmentRule = {
+  match: (segment: string) => boolean;
+  scopes: VariableScope[];
+  confidence: ScopeConfidence;
+};
+
+// "high" = matches a naming pattern that is unambiguous in >=90% of real tokens.
+// "low" = the keyword exists but real usage is genuinely mixed (e.g. "trigger" is only
+// 55% one scope combo, "indicator" splits three ways) — worth suggesting, not worth
+// auto-applying without a human look.
+const FLOAT_SCOPE_RULES: ScopeSegmentRule[] = [
+  { match: (s) => s.indexOf("radius") !== -1, scopes: ["CORNER_RADIUS"], confidence: "high" },
+  { match: (s) => s === "border-width", scopes: ["STROKE_FLOAT"], confidence: "high" },
+  { match: (s) => s === "font-family", scopes: ["FONT_FAMILY"], confidence: "high" },
+  { match: (s) => s === "font-size", scopes: ["FONT_SIZE"], confidence: "high" },
+  { match: (s) => s === "font-weight", scopes: ["FONT_WEIGHT"], confidence: "high" },
+  { match: (s) => s === "line-height", scopes: ["LINE_HEIGHT"], confidence: "high" },
+  { match: (s) => s === "letter-spacing", scopes: ["LETTER_SPACING"], confidence: "high" },
+  { match: (s) => s === "opacity", scopes: ["OPACITY"], confidence: "high" },
+  {
+    match: (s) => s === "horizontal" || s === "vertical" || s === "gap" || s === "spacing",
+    scopes: ["GAP"],
+    confidence: "high"
+  },
+  {
+    match: (s) =>
+      s === "width" ||
+      s === "height" ||
+      s === "sizing" ||
+      s === "min-width" ||
+      s === "max-width" ||
+      s === "min-height" ||
+      s === "max-height",
+    scopes: ["WIDTH_HEIGHT"],
+    confidence: "high"
   }
+];
 
-  if (
-    name.includes("gap") ||
-    name.includes("horizontal") ||
-    name.includes("vertical") ||
-    name.includes("left") ||
-    name.includes("right") ||
-    name.includes("top") ||
-    name.includes("bottom") ||
-    name.includes("spacing")
-  ) {
-    return ["GAP"];
-  }
+const STRING_SCOPE_RULES: ScopeSegmentRule[] = [
+  { match: (s) => s === "font-family", scopes: ["FONT_FAMILY"], confidence: "high" }
+];
 
-  if (name.includes("font-family")) return ["FONT_FAMILY"];
-  if (name.includes("font-size")) return ["FONT_SIZE"];
-  if (name.includes("font-weight")) return ["FONT_WEIGHT"];
-  if (name.includes("letter-spacing")) return ["LETTER_SPACING"];
-  if (name.includes("line-height")) return ["LINE_HEIGHT"];
-  if (name.includes("opacity")) return ["OPACITY"];
+// Checked first, as exact segment matches only (avoids e.g. "button-text" or
+// "text-input" component-name segments being mistaken for a "text" layer).
+const COLOR_SCOPE_RULES_EXACT: ScopeSegmentRule[] = [
+  { match: (s) => s === "title" || s === "subtitle" || s === "text", scopes: ["TEXT_FILL"], confidence: "high" },
+  { match: (s) => s === "border", scopes: ["STROKE_COLOR"], confidence: "high" },
+  {
+    match: (s) => s === "track" || s === "selector",
+    scopes: ["FRAME_FILL", "SHAPE_FILL", "STROKE_COLOR"],
+    confidence: "high"
+  },
+  { match: (s) => s === "bg" || s === "thumb", scopes: ["FRAME_FILL", "SHAPE_FILL"], confidence: "high" },
+  { match: (s) => s === "content", scopes: ["SHAPE_FILL", "TEXT_FILL"], confidence: "high" },
+  { match: (s) => s === "icon" || s === "chevron", scopes: ["SHAPE_FILL"], confidence: "high" },
+  {
+    match: (s) => s === "trigger" || s === "indicator",
+    scopes: ["FRAME_FILL", "SHAPE_FILL", "STROKE_COLOR"],
+    confidence: "low"
+  },
+  { match: (s) => s === "separator", scopes: ["SHAPE_FILL", "STROKE_COLOR"], confidence: "low" }
+];
 
-  if (name.includes("box-shadow") || name.includes("shadow")) {
-    return variable.resolvedType === "COLOR" ? ["EFFECT_COLOR"] : ["EFFECT_FLOAT"];
-  }
+// Fallback pass, only run when nothing matched exactly: catches compound segments like
+// "start-icon"/"end-icon" (contain "icon") or "validation-text" (contains "text").
+const COLOR_SCOPE_RULES_CONTAINS: ScopeSegmentRule[] = [
+  { match: (s) => s.indexOf("icon") !== -1, scopes: ["SHAPE_FILL"], confidence: "high" },
+  { match: (s) => s.indexOf("text") !== -1, scopes: ["TEXT_FILL"], confidence: "high" },
+  { match: (s) => s.indexOf("border") !== -1, scopes: ["STROKE_COLOR"], confidence: "high" }
+];
 
-  if (variable.resolvedType === "COLOR") {
-    if (name.includes("/bg/")) return ["FRAME_FILL"];
-    if (name.includes("/text/")) return ["TEXT_FILL"];
-    if (name.includes("/border/") || name.includes("/line/")) return ["STROKE_COLOR"];
+function getVariableNameSegments(name: string): string[] {
+  return name
+    .toLowerCase()
+    .split("/")
+    .map(function (segment) {
+      return segment.trim();
+    })
+    .filter(Boolean);
+}
 
-    if (
-      name.includes("/trigger/") ||
-      name.includes("/icon/") ||
-      name.includes("/content/") ||
-      name.includes("/thumb/")
-    ) {
-      return ["SHAPE_FILL"];
+function findScopeFromSegments(segments: string[], rules: ScopeSegmentRule[]): ScopeSuggestion | null {
+  for (let i = segments.length - 1; i >= 0; i--) {
+    for (const rule of rules) {
+      if (rule.match(segments[i])) {
+        return { scopes: rule.scopes, confidence: rule.confidence };
+      }
     }
   }
 
-  return ["ALL_SCOPES"];
+  return null;
+}
+
+function suggestScopesFromName(variable: Variable): ScopeSuggestion {
+  const segments = getVariableNameSegments(variable.name);
+  const leaf = segments[segments.length - 1];
+
+  if (segments.indexOf("box-shadow") !== -1) {
+    if (leaf === "x" || leaf === "y" || leaf === "blur" || leaf === "spread") {
+      return { scopes: ["EFFECT_FLOAT"], confidence: "high" };
+    }
+
+    if (leaf === "color") {
+      return { scopes: ["EFFECT_COLOR"], confidence: "high" };
+    }
+
+    if (leaf === "composite") {
+      return { scopes: ["ALL_SCOPES"], confidence: "high" };
+    }
+  }
+
+  // Icon/chevron's own size token is real-world scoped ALL_SCOPES, not WIDTH_HEIGHT —
+  // unlike "layout/.../size" tokens, which are WIDTH_HEIGHT.
+  if (leaf === "size" && (segments.indexOf("icon") !== -1 || segments.indexOf("chevron") !== -1)) {
+    return { scopes: ["ALL_SCOPES"], confidence: "high" };
+  }
+
+  if (variable.resolvedType === "FLOAT") {
+    return findScopeFromSegments(segments, FLOAT_SCOPE_RULES) || { scopes: ["ALL_SCOPES"], confidence: "low" };
+  }
+
+  if (variable.resolvedType === "STRING") {
+    return findScopeFromSegments(segments, STRING_SCOPE_RULES) || { scopes: ["ALL_SCOPES"], confidence: "low" };
+  }
+
+  if (variable.resolvedType === "COLOR") {
+    return (
+      findScopeFromSegments(segments, COLOR_SCOPE_RULES_EXACT) ||
+      findScopeFromSegments(segments, COLOR_SCOPE_RULES_CONTAINS) || { scopes: ["ALL_SCOPES"], confidence: "low" }
+    );
+  }
+
+  return { scopes: ["ALL_SCOPES"], confidence: "low" };
 }
 
 function sameScopes(a: VariableScope[], b: VariableScope[]) {
@@ -1495,7 +1621,8 @@ async function buildScopeReview(): Promise<{ items: ScopeReviewItem[]; summary: 
     if (!variable || variable.remote) continue;
 
     const allowedScopes = getAllowedScopesByType(variable.resolvedType);
-    const suggestedScopes = inferScopesFromName(variable).filter(function (scope) {
+    const suggestion = suggestScopesFromName(variable);
+    const suggestedScopes = suggestion.scopes.filter(function (scope) {
       return allowedScopes.includes(scope);
     });
     const currentScopes = variable.scopes.filter(function (scope) {
@@ -1504,9 +1631,9 @@ async function buildScopeReview(): Promise<{ items: ScopeReviewItem[]; summary: 
 
     const selectedScopes: VariableScope[] =
       suggestedScopes.length > 0
-        ? suggestedScopes.slice(0, 2)
+        ? suggestedScopes.slice(0, 3)
         : currentScopes.length > 0
-          ? currentScopes.slice(0, 2)
+          ? currentScopes.slice(0, 3)
           : (["ALL_SCOPES"] as VariableScope[]);
 
     const isScopeMatched =
@@ -1520,7 +1647,8 @@ async function buildScopeReview(): Promise<{ items: ScopeReviewItem[]; summary: 
       suggestedScopes: suggestedScopes,
       selectedScopes: selectedScopes,
       allowedScopes: allowedScopes,
-      isScopeMatched: isScopeMatched
+      isScopeMatched: isScopeMatched,
+      confidence: suggestion.confidence
     });
   }
 
@@ -1564,8 +1692,73 @@ async function applyVariableScopes(variableId: string, scopes: VariableScope[]) 
     throw new Error("Токен " + variable.name + " нельзя изменить из этого файла");
   }
 
-  const cleanedScopes = Array.from(new Set(scopes.filter(Boolean))).slice(0, 2) as VariableScope[];
+  const cleanedScopes = Array.from(new Set(scopes.filter(Boolean))) as VariableScope[];
   variable.scopes = cleanedScopes;
+}
+
+async function buildAndApplyScopeFix(): Promise<ScopeFixResult> {
+  const localVariables = (await figma.variables.getLocalVariablesAsync()).filter(function (variable) {
+    return !variable.remote;
+  });
+
+  const changes: ScopeFixChange[] = [];
+  const needsReview: ScopeFixReviewEntry[] = [];
+
+  for (const variable of localVariables) {
+    const allowedScopes = getAllowedScopesByType(variable.resolvedType);
+    const suggestion = suggestScopesFromName(variable);
+    const suggestedScopes = suggestion.scopes.filter(function (scope) {
+      return allowedScopes.includes(scope);
+    });
+    const currentScopes = variable.scopes.filter(function (scope) {
+      return allowedScopes.includes(scope);
+    });
+
+    if (!suggestedScopes.length || sameScopes(currentScopes, suggestedScopes)) {
+      continue;
+    }
+
+    const currentScopesText = currentScopes.length ? currentScopes.join(", ") : "No scopes set";
+    const suggestedScopesText = suggestedScopes.join(", ");
+
+    if (suggestion.confidence === "high") {
+      variable.scopes = suggestedScopes as VariableScope[];
+      changes.push({
+        variableId: variable.id,
+        variableName: variable.name,
+        fromScopesText: currentScopesText,
+        toScopesText: suggestedScopesText
+      });
+    } else {
+      needsReview.push({
+        variableId: variable.id,
+        variableName: variable.name,
+        currentScopesText: currentScopesText,
+        suggestedScopesText: suggestedScopesText
+      });
+    }
+  }
+
+  const sortedChanges = changes.sort(function (a, b) {
+    return a.variableName.localeCompare(b.variableName);
+  });
+  const sortedNeedsReview = needsReview.sort(function (a, b) {
+    return a.variableName.localeCompare(b.variableName);
+  });
+
+  const summary =
+    "Проверено локальных токенов: " + localVariables.length + "\n" +
+    "Исправлено автоматически: " + sortedChanges.length + "\n" +
+    "Требуют ручной проверки: " + sortedNeedsReview.length +
+    (sortedChanges.length === 0 && sortedNeedsReview.length === 0
+      ? "\n\nВсе scope уже соответствуют паттернам именования."
+      : "");
+
+  return {
+    summary: summary,
+    changes: sortedChanges,
+    needsReview: sortedNeedsReview
+  };
 }
 
 figma.ui.onmessage = async function (msg: PluginMessage) {
@@ -1595,6 +1788,11 @@ figma.ui.onmessage = async function (msg: PluginMessage) {
     return;
   }
 
+  if (msg.type === "run-fix-scope") {
+    postScopeFixResult(await buildAndApplyScopeFix());
+    return;
+  }
+
   if (msg.type === "run-apply-token-review") {
     const result = await buildApplyTokenReview();
     postApplyTokenReview(result);
@@ -1603,7 +1801,7 @@ figma.ui.onmessage = async function (msg: PluginMessage) {
 
   if (msg.type === "apply-scope") {
     try {
-      const appliedScopes = Array.from(new Set(msg.scopes.filter(Boolean))).slice(0, 2) as VariableScope[];
+      const appliedScopes = Array.from(new Set(msg.scopes.filter(Boolean))).slice(0, 3) as VariableScope[];
       await applyVariableScopes(msg.variableId, appliedScopes);
       postApplyResult("Scope успешно применен.", {
         variableId: msg.variableId,
@@ -1624,7 +1822,7 @@ figma.ui.onmessage = async function (msg: PluginMessage) {
 
     for (const update of msg.updates) {
       try {
-        const appliedScopes = Array.from(new Set(update.scopes.filter(Boolean))).slice(0, 2) as VariableScope[];
+        const appliedScopes = Array.from(new Set(update.scopes.filter(Boolean))).slice(0, 3) as VariableScope[];
         await applyVariableScopes(update.variableId, appliedScopes);
         updates.push({
           variableId: update.variableId,
