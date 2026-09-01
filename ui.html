@@ -1126,6 +1126,13 @@
                   checked
                 />
                 <label class="case-label">${escapeHtml(member.nodePath)} / ${escapeHtml(member.propertyLabel || group.propertyLabel)}</label>
+                <button
+                  type="button"
+                  class="icon-btn select-token-btn"
+                  data-select-node-ids='${escapeHtml(JSON.stringify([member.nodeId]))}'
+                  title="Выделить этот слой"
+                  aria-label="Выделить этот слой"
+                >${ICON_TARGET}</button>
               </li>
             `)
             .join("");
@@ -1170,6 +1177,8 @@
             </div>
           `;
         }).join("");
+
+        wireSelectNodeIdButtons();
 
         document.querySelectorAll("[data-apply-token-group-id]").forEach((button) => {
           button.addEventListener("click", () => {
@@ -1664,6 +1673,13 @@
           });
         });
 
+        wireSelectNodeIdButtons();
+      }
+
+      // Wires up every "select these node ids on canvas" icon button currently in the
+      // DOM — shared by the library review list and the Apply Token examples list.
+      // Safe to call after any innerHTML update; re-queries fresh each time.
+      function wireSelectNodeIdButtons() {
         document.querySelectorAll("[data-select-node-ids]").forEach((button) => {
           button.addEventListener("click", () => {
             const raw = button.getAttribute("data-select-node-ids");
