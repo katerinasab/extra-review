@@ -49,6 +49,24 @@
         padding: 4px 2px 2px;
       }
 
+      .result-head {
+        display: flex;
+        align-items: flex-start;
+        justify-content: space-between;
+        gap: 8px;
+      }
+
+      .icon-btn {
+        flex-shrink: 0;
+        background: transparent;
+        padding: 2px;
+        width: 24px;
+        height: 24px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+
       h1 {
         margin: 0 0 6px;
         font-size: 22px;
@@ -375,10 +393,7 @@
         background: #faf7f1;
       }
 
-      /* Each entry here is already its own bordered card, so this wrapper stays
-         unboxed — a border+background around a list of cards would just be a
-         redundant extra frame around frames. */
-      .review-list-panel {
+      .plain-list-panel {
         margin-top: 8px;
       }
 
@@ -509,7 +524,10 @@
       </div>
 
       <div class="result hidden" id="globalResult">
-        <div class="result-title">Result</div>
+        <div class="result-head">
+          <div class="result-title">Result</div>
+          <button type="button" class="icon-btn" id="copyResultButton" title="Скопировать результат" aria-label="Скопировать результат"></button>
+        </div>
         <div id="resultText"></div>
       </div>
     </div>
@@ -528,6 +546,7 @@
       const toggleIgnoredApplyTokens = document.getElementById("toggleIgnoredApplyTokens");
       const globalResult = document.getElementById("globalResult");
       const resultText = document.getElementById("resultText");
+      const copyResultButton = document.getElementById("copyResultButton");
       let brokenPathsExpanded = false;
       let lastBrokenTokensResult = null;
       let currentApplyTokenGroups = [];
@@ -1167,6 +1186,55 @@
           <path d="M6 10.2L8.6 12.8L14 7.2" stroke="white" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
         </svg>
       `;
+      const ICON_COPY = `
+        <svg width="18" height="18" viewBox="0 0 18 18" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <rect x="6.5" y="6.5" width="9" height="9" rx="1.5" stroke="#9a6b16" stroke-width="1.3"/>
+          <path d="M4 11.5H3.5C2.67157 11.5 2 10.8284 2 10V3.5C2 2.67157 2.67157 2 3.5 2H10C10.8284 2 11.5 2.67157 11.5 3.5V4" stroke="#9a6b16" stroke-width="1.3" stroke-linecap="round"/>
+        </svg>
+      `;
+      const ICON_COPIED = `
+        <svg width="18" height="18" viewBox="0 0 18 18" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <path d="M3.5 9.5L7 13L14.5 4.5" stroke="#17824f" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+      `;
+
+      if (copyResultButton) {
+        copyResultButton.innerHTML = ICON_COPY;
+      }
+
+      function copyResultToClipboard() {
+        const text = (resultText.innerText || resultText.textContent || "").trim();
+        if (!text) return;
+
+        const textarea = document.createElement("textarea");
+        textarea.value = text;
+        textarea.style.position = "fixed";
+        textarea.style.opacity = "0";
+        document.body.appendChild(textarea);
+        textarea.focus();
+        textarea.select();
+
+        try {
+          document.execCommand("copy");
+          debugLog("copy result: ok");
+          if (copyResultButton) {
+            copyResultButton.innerHTML = ICON_COPIED;
+            copyResultButton.title = "Скопировано";
+            setTimeout(() => {
+              copyResultButton.innerHTML = ICON_COPY;
+              copyResultButton.title = "Скопировать результат";
+            }, 1200);
+          }
+        } catch (error) {
+          debugLog("copy result failed", error);
+        }
+
+        document.body.removeChild(textarea);
+      }
+
+      if (copyResultButton) {
+        copyResultButton.addEventListener("click", copyResultToClipboard);
+      }
 
       function sameScopeArrays(a, b) {
         if (a.length !== b.length) return false;
@@ -1282,7 +1350,7 @@
                 <button id="toggleScopeFixChanges" class="secondary-btn toggle-details">
                   ${scopeFixChangesExpanded ? "Скрыть список" : "Показать список"}
                 </button>
-                <div class="details-panel ${scopeFixChangesExpanded ? "" : "hidden"}" id="scopeFixChangesPanel">
+                <div class="plain-list-panel ${scopeFixChangesExpanded ? "" : "hidden"}" id="scopeFixChangesPanel">
                   <ul class="details-list">
                     ${changes.map(renderScopeFixChangeEntry).join("")}
                   </ul>
@@ -1298,7 +1366,7 @@
                 <button id="toggleScopeFixReview" class="secondary-btn toggle-details">
                   ${scopeFixReviewExpanded ? "Скрыть список" : "Показать список"}
                 </button>
-                <div class="review-list-panel ${scopeFixReviewExpanded ? "" : "hidden"}" id="scopeFixReviewPanel">
+                <div class="plain-list-panel ${scopeFixReviewExpanded ? "" : "hidden"}" id="scopeFixReviewPanel">
                   <ul class="case-list">
                     ${needsReview.map(renderScopeFixReviewEntry).join("")}
                   </ul>
