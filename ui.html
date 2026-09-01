@@ -167,6 +167,21 @@
         margin-top: 16px;
       }
 
+      .folder-picker-row {
+        display: flex;
+        gap: 8px;
+        align-items: center;
+      }
+
+      .folder-picker-row select {
+        flex: 1;
+        min-width: 0;
+      }
+
+      .folder-picker-row button {
+        flex-shrink: 0;
+      }
+
       .sticky-summary {
         position: sticky;
         top: 8px;
@@ -422,6 +437,32 @@
         margin: 6px 0 0;
       }
 
+      .library-token-list {
+        list-style: none;
+        padding-left: 0;
+        margin: 6px 0 0;
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+      }
+
+      .library-token-row {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 8px;
+      }
+
+      .library-token-name {
+        font-weight: 700;
+        word-break: break-word;
+      }
+
+      .select-token-btn:disabled {
+        opacity: 0.35;
+        cursor: default;
+      }
+
       .case-item {
         display: flex;
         align-items: flex-start;
@@ -480,6 +521,39 @@
             <span class="action-title">Применить токен</span>
             <span class="action-desc">Найти значения без токенов и предложить подходящие токены.</span>
           </button>
+
+          <button class="action-card" data-action="library-review">
+            <span class="action-title">Определить библиотеку</span>
+            <span class="action-desc">Показать, какие токены и из каких библиотек используются на выбранном объекте.</span>
+          </button>
+        </div>
+      </div>
+
+      <div id="fixScopeView" class="hidden">
+        <div class="hero">
+          <button id="backToHomeFromFixScope" class="back-link">← Extra Review / Fix Scope</button>
+          <h1>Поправить scope</h1>
+          <p class="subtitle">Выбери компонент (учитываются токены из коллекций Size и Theme) и нажми «Поправить scope» — или используй «Исправить всё», чтобы проверить сразу все локальные токены файла.</p>
+          <div class="hero-actions folder-picker-row">
+            <select id="fixScopeFolderSelect" disabled>
+              <option value="">Загрузка папок…</option>
+            </select>
+            <button id="fixScopeFolderButton" class="primary-btn" disabled>Поправить scope</button>
+          </div>
+          <div class="hero-actions">
+            <button id="fixScopeAllButton" class="secondary-btn">Исправить всё</button>
+          </div>
+        </div>
+      </div>
+
+      <div id="libraryView" class="hidden">
+        <div class="hero">
+          <button id="backToHomeFromLibrary" class="back-link">← Extra Review / Library Review</button>
+          <h1>Определить библиотеку</h1>
+          <p class="subtitle">Выдели объект (или несколько) в Figma и нажми «Проверить библиотеки» — в результате будет видно, какие токены и из каких библиотек используются на этом элементе.</p>
+          <div class="hero-actions">
+            <button id="analyzeLibraries" class="primary-btn">Проверить библиотеки</button>
+          </div>
         </div>
       </div>
 
@@ -536,6 +610,8 @@
       const homeView = document.getElementById("homeView");
       const scopeView = document.getElementById("scopeView");
       const applyTokenView = document.getElementById("applyTokenView");
+      const libraryView = document.getElementById("libraryView");
+      const fixScopeView = document.getElementById("fixScopeView");
       const scopeCards = document.getElementById("scopeCards");
       const scopeSummary = document.getElementById("scopeSummary");
       const scopeSummaryText = document.getElementById("scopeSummaryText");
@@ -556,6 +632,7 @@
       let lastScopeFixResult = null;
       let scopeFixChangesExpanded = false;
       let scopeFixReviewExpanded = false;
+      let lastLibraryReviewResult = null;
 
       function debugLog(label, payload) {
         if (payload === undefined) {
@@ -589,6 +666,8 @@
         homeView.classList.remove("hidden");
         scopeView.classList.add("hidden");
         applyTokenView.classList.add("hidden");
+        libraryView.classList.add("hidden");
+        fixScopeView.classList.add("hidden");
       }
 
       function showScope() {
@@ -596,6 +675,8 @@
         homeView.classList.add("hidden");
         scopeView.classList.remove("hidden");
         applyTokenView.classList.add("hidden");
+        libraryView.classList.add("hidden");
+        fixScopeView.classList.add("hidden");
         globalResult.classList.remove("hidden");
       }
 
@@ -604,7 +685,58 @@
         homeView.classList.add("hidden");
         scopeView.classList.add("hidden");
         applyTokenView.classList.remove("hidden");
+        libraryView.classList.add("hidden");
+        fixScopeView.classList.add("hidden");
         globalResult.classList.add("hidden");
+      }
+
+      function showLibrary() {
+        debugLog("showLibrary");
+        homeView.classList.add("hidden");
+        scopeView.classList.add("hidden");
+        applyTokenView.classList.add("hidden");
+        libraryView.classList.remove("hidden");
+        fixScopeView.classList.add("hidden");
+        globalResult.classList.add("hidden");
+      }
+
+      function showFixScope() {
+        debugLog("showFixScope");
+        homeView.classList.add("hidden");
+        scopeView.classList.add("hidden");
+        applyTokenView.classList.add("hidden");
+        libraryView.classList.add("hidden");
+        fixScopeView.classList.remove("hidden");
+        globalResult.classList.add("hidden");
+
+        const select = document.getElementById("fixScopeFolderSelect");
+        const folderButton = document.getElementById("fixScopeFolderButton");
+        if (select) {
+          select.innerHTML = '<option value="">Загрузка папок…</option>';
+          select.disabled = true;
+        }
+        if (folderButton) folderButton.disabled = true;
+
+        parent.postMessage({ pluginMessage: { type: "run-list-scope-fix-folders" } }, "*");
+      }
+
+      function renderFixScopeFolderOptions(folders) {
+        const select = document.getElementById("fixScopeFolderSelect");
+        const folderButton = document.getElementById("fixScopeFolderButton");
+        if (!select) return;
+
+        if (!folders || !folders.length) {
+          select.innerHTML = '<option value="">Компоненты не найдены</option>';
+          select.disabled = true;
+          if (folderButton) folderButton.disabled = true;
+          return;
+        }
+
+        select.innerHTML = folders
+          .map((folder) => `<option value="${escapeHtml(folder.folderId)}">${escapeHtml(folder.label)} (${folder.count})</option>`)
+          .join("");
+        select.disabled = false;
+        if (folderButton) folderButton.disabled = false;
       }
 
       function setApplyTokenStatus(text) {
@@ -1197,6 +1329,13 @@
           <path d="M3.5 9.5L7 13L14.5 4.5" stroke="#17824f" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
         </svg>
       `;
+      // Mirrors Figma's own "Select N using this color" target icon in Selection colors.
+      const ICON_TARGET = `
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <circle cx="8" cy="8" r="6.3" stroke="#9a6b16" stroke-width="1.3"/>
+          <circle cx="8" cy="8" r="2.2" stroke="#9a6b16" stroke-width="1.3"/>
+        </svg>
+      `;
 
       if (copyResultButton) {
         copyResultButton.innerHTML = ICON_COPY;
@@ -1454,6 +1593,98 @@
         renderScopeFixResult(lastScopeFixResult);
       }
 
+      function pluralizeLayers(count) {
+        const mod10 = count % 10;
+        const mod100 = count % 100;
+        if (mod10 === 1 && mod100 !== 11) return "слой";
+        if (mod10 >= 2 && mod10 <= 4 && (mod100 < 12 || mod100 > 14)) return "слоя";
+        return "слоёв";
+      }
+
+      function renderLibraryUsageToken(token) {
+        const nodeIds = Array.isArray(token.nodeIds) ? token.nodeIds : [];
+        const count = nodeIds.length;
+        const disabled = count ? "" : "disabled";
+        const title = count
+          ? `Выделить ${count} ${pluralizeLayers(count)} с этим токеном`
+          : "Нет доступных слоёв для выделения";
+
+        return `
+          <li class="library-token-row">
+            <span class="library-token-name">${escapeHtml(token.variableName)}</span>
+            <button
+              type="button"
+              class="icon-btn select-token-btn"
+              data-select-node-ids='${escapeHtml(JSON.stringify(nodeIds))}'
+              title="${escapeHtml(title)}"
+              aria-label="${escapeHtml(title)}"
+              ${disabled}
+            >${ICON_TARGET}</button>
+          </li>
+        `;
+      }
+
+      function renderLibraryGroup(group) {
+        if (group.expanded === undefined) group.expanded = false;
+
+        const tokens = Array.isArray(group.tokens) ? group.tokens : [];
+
+        return `
+          <div class="result-block compact-block">
+            <div class="section-title">${escapeHtml(group.libraryLabel)} (${tokens.length})</div>
+            <button type="button" class="secondary-btn toggle-details" data-library-group-toggle="${group.groupId}">
+              ${group.expanded ? "Скрыть список" : "Показать список"}
+            </button>
+            <div class="plain-list-panel ${group.expanded ? "" : "hidden"}">
+              <ul class="library-token-list">
+                ${tokens.map(renderLibraryUsageToken).join("")}
+              </ul>
+            </div>
+          </div>
+        `;
+      }
+
+      function renderLibraryReviewResult(data) {
+        lastLibraryReviewResult = data;
+
+        const groups = Array.isArray(data.groups) ? data.groups : [];
+
+        resultText.innerHTML = `
+          <div class="summary-block">${escapeHtml(data.summary || "")}</div>
+          ${groups.map(renderLibraryGroup).join("")}
+        `;
+
+        document.querySelectorAll("[data-library-group-toggle]").forEach((button) => {
+          button.addEventListener("click", () => {
+            const groupId = button.getAttribute("data-library-group-toggle");
+            const group = (lastLibraryReviewResult.groups || []).find((g) => g.groupId === groupId);
+            if (!group) return;
+            group.expanded = !group.expanded;
+            renderLibraryReviewResult(lastLibraryReviewResult);
+          });
+        });
+
+        document.querySelectorAll("[data-select-node-ids]").forEach((button) => {
+          button.addEventListener("click", () => {
+            const raw = button.getAttribute("data-select-node-ids");
+            if (!raw) return;
+
+            let nodeIds = [];
+            try {
+              nodeIds = JSON.parse(raw);
+            } catch (error) {
+              debugLog("select-nodes parse failed", error);
+              return;
+            }
+
+            if (!nodeIds.length) return;
+
+            debugLog("select-nodes click", { count: nodeIds.length });
+            parent.postMessage({ pluginMessage: { type: "select-nodes", nodeIds } }, "*");
+          });
+        });
+      }
+
       document.querySelectorAll(".action-card").forEach((button) => {
         button.addEventListener("click", () => {
           const action = button.dataset.action;
@@ -1466,10 +1697,12 @@
           }
 
           if (action === "fix-scope") {
-            showHome();
-            globalResult.classList.remove("hidden");
-            resultText.textContent = "Проверяю и исправляю scope у локальных токенов файла…";
-            parent.postMessage({ pluginMessage: { type: "run-fix-scope" } }, "*");
+            showFixScope();
+            return;
+          }
+
+          if (action === "library-review") {
+            showLibrary();
             return;
           }
 
@@ -1495,6 +1728,41 @@
       document.getElementById("analyzeApplyTokens").addEventListener("click", () => {
         debugLog("analyzeApplyTokens click");
         parent.postMessage({ pluginMessage: { type: "run-apply-token-review" } }, "*");
+      });
+
+      document.getElementById("backToHomeFromLibrary").addEventListener("click", () => {
+        debugLog("back from library click");
+        showHome();
+      });
+
+      document.getElementById("analyzeLibraries").addEventListener("click", () => {
+        debugLog("analyzeLibraries click");
+        globalResult.classList.remove("hidden");
+        resultText.textContent = "Проверяю библиотеки токенов на выбранном объекте…";
+        parent.postMessage({ pluginMessage: { type: "run-library-review" } }, "*");
+      });
+
+      document.getElementById("backToHomeFromFixScope").addEventListener("click", () => {
+        debugLog("back from fix scope click");
+        showHome();
+      });
+
+      document.getElementById("fixScopeFolderButton").addEventListener("click", () => {
+        const select = document.getElementById("fixScopeFolderSelect");
+        const folderId = select && select.value ? select.value : "";
+        if (!folderId) return;
+
+        debugLog("fixScopeFolderButton click", { folderId });
+        globalResult.classList.remove("hidden");
+        resultText.textContent = `Проверяю и исправляю scope у токенов папки «${folderId}»…`;
+        parent.postMessage({ pluginMessage: { type: "run-fix-scope", folderId } }, "*");
+      });
+
+      document.getElementById("fixScopeAllButton").addEventListener("click", () => {
+        debugLog("fixScopeAllButton click");
+        globalResult.classList.remove("hidden");
+        resultText.textContent = "Проверяю и исправляю scope у всех локальных токенов файла…";
+        parent.postMessage({ pluginMessage: { type: "run-fix-scope" } }, "*");
       });
 
       toggleIgnoredApplyTokens.addEventListener("click", () => {
@@ -1550,11 +1818,27 @@
         }
 
         if (msg.type === "scope-fix-result") {
-          showHome();
           globalResult.classList.remove("hidden");
           scopeFixChangesExpanded = false;
           scopeFixReviewExpanded = false;
           renderScopeFixResult(msg);
+        }
+
+        if (msg.type === "scope-fix-folders-result") {
+          renderFixScopeFolderOptions(msg.folders);
+        }
+
+        if (msg.type === "library-review-result") {
+          globalResult.classList.remove("hidden");
+          renderLibraryReviewResult(msg);
+        }
+
+        if (msg.type === "select-nodes-result") {
+          if (msg.error) {
+            debugLog("select-nodes-result error", msg.error);
+          } else {
+            debugLog("select-nodes-result ok", { selectedCount: msg.selectedCount });
+          }
         }
 
         if (msg.type === "scope-review-result") {

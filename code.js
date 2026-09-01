@@ -33,6 +33,57 @@ function postScopeFixResult(result) {
         needsReview: result.needsReview
     });
 }
+function postScopeFixFolders(folders) {
+    figma.ui.postMessage({
+        type: "scope-fix-folders-result",
+        folders: folders
+    });
+}
+function postLibraryReview(result) {
+    figma.ui.postMessage({
+        type: "library-review-result",
+        summary: result.summary,
+        groups: result.groups
+    });
+}
+function postSelectNodesResult(payload) {
+    figma.ui.postMessage({
+        type: "select-nodes-result",
+        selectedCount: payload.selectedCount,
+        error: payload.error
+    });
+}
+async function selectNodesByIds(nodeIds) {
+    const nodes = [];
+    for (const nodeId of nodeIds) {
+        try {
+            const node = await figma.getNodeByIdAsync(nodeId);
+            if (node && "type" in node && node.type !== "DOCUMENT" && node.type !== "PAGE") {
+                nodes.push(node);
+            }
+        }
+        catch (error) {
+            // Node no longer exists — skip it.
+        }
+    }
+    if (!nodes.length) {
+        return {
+            selectedCount: 0,
+            error: "Слои не найдены — возможно, они были удалены."
+        };
+    }
+    try {
+        figma.currentPage.selection = nodes;
+        figma.viewport.scrollAndZoomIntoView(nodes);
+        return { selectedCount: nodes.length };
+    }
+    catch (error) {
+        return {
+            selectedCount: 0,
+            error: "Не удалось выделить слои — возможно, они на другой странице."
+        };
+    }
+}
 function postApplyResult(text, payload) {
     const message = {
         type: "apply-result",
@@ -819,6 +870,151 @@ async function applyTokenToTarget(nodeId, variableId, target) {
         sceneNode.strokes = nextPaints;
     }
 }
+async function buildLibraryReview() {
+    const selectedRoots = getSelectedRoots();
+    if (!selectedRoots.length) {
+        return {
+            summary: "Ничего не выбрано.\n\nВыбери один или несколько слоев в Figma и нажми «Проверить библиотеки».",
+            groups: []
+        };
+    }
+    const references = [];
+    for (const root of selectedRoots) {
+        const nodes = [root];
+        if ("findAll" in root) {
+            nodes.push(...root.findAll());
+        }
+        for (const node of nodes) {
+            collectNodeVariableIds(node).forEach(function (variableId) {
+                references.push({ nodeId: node.id, variableId: variableId });
+            });
+        }
+    }
+    const nodeIdsByVariableId = new Map();
+    references.forEach(function (reference) {
+        const set = nodeIdsByVariableId.get(reference.variableId) || new Set();
+        set.add(reference.nodeId);
+        nodeIdsByVariableId.set(reference.variableId, set);
+    });
+    const uniqueVariableIds = Array.from(nodeIdsByVariableId.keys());
+    if (!uniqueVariableIds.length) {
+        return {
+            summary: "Выберите объект с токенами.",
+            groups: []
+        };
+    }
+    // Resolve remote collections to the library they were published from. This is only
+    // a lookup table matched by collection.key — if it can't be loaded for any reason,
+    // remote tokens still get grouped, just under a generic "external library" label
+    // built from the collection's own name instead of the friendly library title.
+    let libraryCollections = [];
+    try {
+        libraryCollections = await figma.teamLibrary.getAvailableLibraryVariableCollectionsAsync();
+    }
+    catch (error) {
+        libraryCollections = [];
+    }
+    const groupsByKey = new Map();
+    let unresolvedCount = 0;
+    // Figma only reveals a library's real name for libraries currently ENABLED in this
+    // file (Assets → Team library) — that's a hard Plugin API limit, not something we can
+    // work around. When a remote collection's library isn't enabled, its name is unknown
+    // even though the token itself still resolves and works fine.
+    let unresolvedLibraryCount = 0;
+    for (const variableId of uniqueVariableIds) {
+        const nodeIds = Array.from(nodeIdsByVariableId.get(variableId) || []);
+        let variable = null;
+        try {
+            variable = await figma.variables.getVariableByIdAsync(variableId);
+        }
+        catch (error) {
+            variable = null;
+        }
+        if (!variable) {
+            unresolvedCount += 1;
+            continue;
+        }
+        let groupKey = "local";
+        let libraryLabel = "Локальные токены файла";
+        const isLocal = !variable.remote;
+        if (variable.remote) {
+            let collectionName = "";
+            let collectionKey = "";
+            try {
+                const collection = await figma.variables.getVariableCollectionByIdAsync(variable.variableCollectionId);
+                if (collection) {
+                    collectionName = collection.name;
+                    collectionKey = collection.key;
+                }
+            }
+            catch (error) {
+                // Collection unreachable — fall back to the generic label below.
+            }
+            const matchedLibrary = libraryCollections.find(function (entry) {
+                return collectionKey !== "" && entry.key === collectionKey;
+            });
+            if (matchedLibrary) {
+                libraryLabel = matchedLibrary.libraryName;
+                groupKey = "lib:" + matchedLibrary.libraryName;
+            }
+            else {
+                unresolvedLibraryCount += 1;
+                libraryLabel =
+                    "Библиотека не включена в файле" + (collectionName ? " (коллекция «" + collectionName + "»)" : "");
+                groupKey = "lib-unresolved:" + (collectionName || "unknown");
+            }
+        }
+        if (!groupsByKey.has(groupKey)) {
+            groupsByKey.set(groupKey, {
+                groupId: groupKey,
+                libraryLabel: libraryLabel,
+                isLocal: isLocal,
+                tokens: []
+            });
+        }
+        groupsByKey.get(groupKey).tokens.push({
+            variableId: variable.id,
+            variableName: variable.name,
+            nodeIds: nodeIds
+        });
+    }
+    const groups = Array.from(groupsByKey.values());
+    groups.forEach(function (group) {
+        group.tokens.sort(function (a, b) {
+            return a.variableName.localeCompare(b.variableName);
+        });
+    });
+    groups.sort(function (a, b) {
+        if (a.isLocal !== b.isLocal) {
+            return a.isLocal ? 1 : -1;
+        }
+        return a.libraryLabel.localeCompare(b.libraryLabel);
+    });
+    const selectedNames = selectedRoots.map(function (node) {
+        return node.name;
+    }).join(", ");
+    const libraryCount = groups.filter(function (group) {
+        return !group.isLocal;
+    }).length;
+    const localTokenCount = groups
+        .filter(function (group) {
+        return group.isLocal;
+    })
+        .reduce(function (sum, group) {
+        return sum + group.tokens.length;
+    }, 0);
+    const summary = "Проверил библиотеки токенов в объекте(объектах) " + selectedNames + "\n\n" +
+        "Найдено уникальных токенов: " + uniqueVariableIds.length + "\n" +
+        "Библиотек: " + libraryCount + "\n" +
+        "Локальных токенов: " + localTokenCount +
+        (unresolvedCount > 0 ? "\nНе удалось определить: " + unresolvedCount : "") +
+        (unresolvedLibraryCount > 0
+            ? "\n\nДля " +
+                unresolvedLibraryCount +
+                " токен(ов) не удалось получить название библиотеки — убедись, что нужная библиотека включена в этом файле (Assets → Team library), и запусти проверку ещё раз."
+            : "");
+    return { summary: summary, groups: groups };
+}
 async function buildBrokenTokensReport() {
     const selectedRoots = getSelectedRoots();
     if (!selectedRoots.length) {
@@ -1091,6 +1287,62 @@ function isLegacySizeStructure(segments) {
         return LEGACY_SIZE_SEGMENTS.indexOf(segment) !== -1;
     });
 }
+// The team's own "folder" convention: a component's tokens live under the "Size" or
+// "Theme" variable collection, and within that collection the token's own name starts
+// with the component's name — e.g. collection "Theme" + variable
+// "accordion/item-header/color/..." => folder "theme/accordion". Matched by substring
+// so it still works whether the collection is literally named "Size"/"Theme" or
+// something like "Sizing".
+function classifyCollectionBucket(collectionName) {
+    const normalized = collectionName.toLowerCase();
+    if (normalized.indexOf("size") !== -1)
+        return "size";
+    if (normalized.indexOf("theme") !== -1)
+        return "theme";
+    return null;
+}
+async function getLocalCollectionNamesById() {
+    const localCollections = await figma.variables.getLocalVariableCollectionsAsync();
+    const collectionsById = new Map();
+    localCollections.forEach(function (collection) {
+        collectionsById.set(collection.id, collection.name);
+    });
+    return collectionsById;
+}
+// The folder is just the component name — a variable counts toward it as long as it
+// lives in a "Size" or "Theme"-like collection (that's what tells us it's structured
+// per-component at all); which of the two doesn't matter for the folder identity.
+function getVariableFolderId(variable, collectionsById) {
+    const collectionName = collectionsById.get(variable.variableCollectionId) || "";
+    const bucket = classifyCollectionBucket(collectionName);
+    if (!bucket)
+        return null;
+    const segments = getVariableNameSegments(variable.name);
+    const component = segments[0];
+    if (!component)
+        return null;
+    return component;
+}
+async function listScopeFixFolders() {
+    const localVariables = (await figma.variables.getLocalVariablesAsync()).filter(function (variable) {
+        return !variable.remote;
+    });
+    const collectionsById = await getLocalCollectionNamesById();
+    const counts = new Map();
+    localVariables.forEach(function (variable) {
+        const folderId = getVariableFolderId(variable, collectionsById);
+        if (!folderId)
+            return;
+        counts.set(folderId, (counts.get(folderId) || 0) + 1);
+    });
+    const folders = Array.from(counts.entries()).map(function (entry) {
+        return { folderId: entry[0], label: entry[0], count: entry[1] };
+    });
+    folders.sort(function (a, b) {
+        return a.folderId.localeCompare(b.folderId);
+    });
+    return folders;
+}
 function getVariableNameSegments(name) {
     return name
         .toLowerCase()
@@ -1281,10 +1533,17 @@ async function applyVariableScopes(variableId, scopes) {
     const cleanedScopes = Array.from(new Set(scopes.filter(Boolean)));
     variable.scopes = cleanedScopes;
 }
-async function buildAndApplyScopeFix() {
-    const localVariables = (await figma.variables.getLocalVariablesAsync()).filter(function (variable) {
+async function buildAndApplyScopeFix(folderId) {
+    const allLocalVariables = (await figma.variables.getLocalVariablesAsync()).filter(function (variable) {
         return !variable.remote;
     });
+    let localVariables = allLocalVariables;
+    if (folderId) {
+        const collectionsById = await getLocalCollectionNamesById();
+        localVariables = allLocalVariables.filter(function (variable) {
+            return getVariableFolderId(variable, collectionsById) === folderId;
+        });
+    }
     const changes = [];
     const needsReview = [];
     let legacySizeCount = 0;
@@ -1339,7 +1598,10 @@ async function buildAndApplyScopeFix() {
     const sortedNeedsReview = needsReview.sort(function (a, b) {
         return a.variableName.localeCompare(b.variableName);
     });
-    const summary = "Проверено локальных токенов: " + localVariables.length + "\n" +
+    const summary = (folderId ? "Папка: " + folderId + "\n" : "") +
+        (folderId
+            ? "Проверено токенов в папке: " + localVariables.length + " из " + allLocalVariables.length + " локальных\n"
+            : "Проверено локальных токенов: " + localVariables.length + "\n") +
         "Исправлено автоматически: " + sortedChanges.length + "\n" +
         "Требуют ручной проверки: " + sortedNeedsReview.length +
         (legacySizeCount > 0 ? "\nУстаревшая структура имени (small/medium/large в пути): " + legacySizeCount : "") +
@@ -1377,8 +1639,20 @@ figma.ui.onmessage = async function (msg) {
         postScopeReview(result.items, result.summary);
         return;
     }
+    if (msg.type === "run-list-scope-fix-folders") {
+        postScopeFixFolders(await listScopeFixFolders());
+        return;
+    }
     if (msg.type === "run-fix-scope") {
-        postScopeFixResult(await buildAndApplyScopeFix());
+        postScopeFixResult(await buildAndApplyScopeFix(msg.folderId));
+        return;
+    }
+    if (msg.type === "run-library-review") {
+        postLibraryReview(await buildLibraryReview());
+        return;
+    }
+    if (msg.type === "select-nodes") {
+        postSelectNodesResult(await selectNodesByIds(msg.nodeIds));
         return;
     }
     if (msg.type === "run-apply-token-review") {
