@@ -215,6 +215,38 @@ function collectNodeVariableIds(node) {
         return reference.variableId;
     });
 }
+// The scope-fix flow scans ALL local variables in the file/folder — it isn't driven by
+// a selection like the other reviews — so there's no ready-made set of "the layers that
+// use this token" to offer a select-layer action on. This does one pass over the
+// current page to build that mapping for just the variables we actually need it for.
+// Scoped to the current page (not the whole multi-page document) to keep it fast;
+// capped per variable so a token used thousands of times doesn't blow up the result.
+async function findNodeUsagesOnCurrentPage(variableIds, capPerVariable) {
+    const usageMap = new Map();
+    if (!variableIds.size) {
+        return usageMap;
+    }
+    const nodes = figma.currentPage.findAll(function () {
+        return true;
+    });
+    for (const node of nodes) {
+        const nodeVariableIds = collectNodeVariableIds(node);
+        if (!nodeVariableIds.length) {
+            continue;
+        }
+        for (const variableId of nodeVariableIds) {
+            if (!variableIds.has(variableId)) {
+                continue;
+            }
+            const existing = usageMap.get(variableId) || [];
+            if (existing.length < capPerVariable) {
+                existing.push(node.id);
+                usageMap.set(variableId, existing);
+            }
+        }
+    }
+    return usageMap;
+}
 function normalizePathSegment(segment) {
     return segment.trim().replace(/\s+/g, "-").toLowerCase();
 }
@@ -1301,7 +1333,7 @@ const NO_SUGGESTION = { scopes: [], confidence: "low" };
 // options, not worth auto-applying without a human look.
 const FLOAT_SCOPE_RULES = [
     { match: (s) => s.indexOf("radius") !== -1, scopes: ["CORNER_RADIUS"], confidence: "high" },
-    { match: (s) => s === "border-width", scopes: ["STROKE_FLOAT"], confidence: "high" },
+    { match: (s) => s === "border-width", scopes: ["STROKE_FLOAT", "WIDTH_HEIGHT"], confidence: "high" },
     { match: (s) => s === "font-family", scopes: ["FONT_FAMILY"], confidence: "high" },
     { match: (s) => s === "font-size", scopes: ["FONT_SIZE"], confidence: "high" },
     { match: (s) => s === "font-weight", scopes: ["FONT_WEIGHT"], confidence: "high" },
@@ -1695,7 +1727,8 @@ async function buildAndApplyScopeFix(folderId) {
                 currentScopesText: currentScopesText,
                 quickScopes: rankIndividualScopes(alternatives, 2),
                 allowedScopes: allowedScopes,
-                isLegacySizeStructure: isLegacySize
+                isLegacySizeStructure: isLegacySize,
+                nodeIds: []
             });
         }
     }
@@ -1705,6 +1738,15 @@ async function buildAndApplyScopeFix(folderId) {
     const sortedNeedsReview = needsReview.sort(function (a, b) {
         return a.variableName.localeCompare(b.variableName);
     });
+    if (sortedNeedsReview.length) {
+        const neededVariableIds = new Set(sortedNeedsReview.map(function (entry) {
+            return entry.variableId;
+        }));
+        const usageMap = await findNodeUsagesOnCurrentPage(neededVariableIds, 25);
+        sortedNeedsReview.forEach(function (entry) {
+            entry.nodeIds = usageMap.get(entry.variableId) || [];
+        });
+    }
     const summary = (folderId ? "Папка: " + folderId + "\n" : "") +
         (folderId
             ? "Проверено токенов в папке: " + localVariables.length + " из " + allLocalVariables.length + " локальных\n"

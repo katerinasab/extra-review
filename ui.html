@@ -302,6 +302,13 @@
         display: block;
       }
 
+      .fix-review-head-icons {
+        flex-shrink: 0;
+        display: flex;
+        align-items: center;
+        gap: 6px;
+      }
+
       .apply-chip-btn {
         background: var(--success);
         border: 1px solid var(--success);
@@ -1503,11 +1510,28 @@
         const isDirty = !entry.appliedScopes || !sameScopeArrays(entry.selectedScopes, entry.appliedScopes);
         const showApply = hasSelection && isDirty;
 
+        const nodeIds = Array.isArray(entry.nodeIds) ? entry.nodeIds : [];
+        const selectDisabled = nodeIds.length ? "" : "disabled";
+        const selectTitle = nodeIds.length
+          ? `Выделить ${nodeIds.length} ${pluralizeLayers(nodeIds.length)} с этим токеном`
+          : "Токен не используется на текущей странице";
+
         return `
           <li class="fix-review-card" id="fix-review-${entry.variableId}">
             <div class="fix-review-head">
               <div class="fix-review-name">${escapeHtml(entry.variableName)}</div>
-              <div class="fix-review-status-icon">${entry.appliedScopes ? ICON_APPLIED : ICON_INFO}</div>
+              <div class="fix-review-head-icons">
+                <button
+                  type="button"
+                  class="icon-btn select-token-btn"
+                  data-select-node-ids='${escapeHtml(JSON.stringify(nodeIds))}'
+                  data-copy-name="${escapeHtml(entry.variableName || "")}"
+                  title="${escapeHtml(selectTitle)}"
+                  aria-label="${escapeHtml(selectTitle)}"
+                  ${selectDisabled}
+                >${ICON_TARGET}</button>
+                <div class="fix-review-status-icon">${entry.appliedScopes ? ICON_APPLIED : ICON_INFO}</div>
+              </div>
             </div>
             <div class="meta">Current: ${escapeHtml(entry.currentScopesText)}</div>
             ${legacyBadge}
@@ -1627,6 +1651,8 @@
             );
           });
         });
+
+        wireSelectNodeIdButtons();
       }
 
       function markScopeFixReviewResolved(variableId, scopes) {
