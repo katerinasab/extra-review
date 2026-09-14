@@ -12,6 +12,7 @@
         --border: #eadfce;
         --success: #17824f;
         --warning: #9a6b16;
+        --danger: #c42a2a;
       }
 
       * {
@@ -25,7 +26,7 @@
         font-size: 12px;
         line-height: 1.4;
         color: var(--text);
-        background: linear-gradient(180deg, #f8f5ef 0%, #f2eee7 100%);
+        background: var(--bg);
       }
 
       .app {
@@ -42,6 +43,28 @@
         border: 1px solid var(--border);
         border-radius: 16px;
         padding: 14px;
+      }
+
+      .home-header {
+        padding: 4px 2px 2px;
+      }
+
+      .result-head {
+        display: flex;
+        align-items: flex-start;
+        justify-content: space-between;
+        gap: 8px;
+      }
+
+      .icon-btn {
+        flex-shrink: 0;
+        background: transparent;
+        padding: 2px;
+        width: 24px;
+        height: 24px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
       }
 
       h1 {
@@ -127,6 +150,14 @@
         color: white;
       }
 
+      .primary-btn:disabled,
+      .secondary-btn:disabled,
+      button:disabled {
+        background: #d8d1c4;
+        color: #8f877b;
+        cursor: not-allowed;
+      }
+
       .secondary-btn {
         background: #e9e4db;
         color: var(--text);
@@ -134,6 +165,21 @@
 
       .hero-actions {
         margin-top: 16px;
+      }
+
+      .folder-picker-row {
+        display: flex;
+        gap: 8px;
+        align-items: center;
+      }
+
+      .folder-picker-row select {
+        flex: 1;
+        min-width: 0;
+      }
+
+      .folder-picker-row button {
+        flex-shrink: 0;
       }
 
       .sticky-summary {
@@ -184,6 +230,119 @@
         color: var(--warning);
       }
 
+      .badge-legacy {
+        display: inline-flex;
+        align-items: center;
+        padding: 5px 9px;
+        border-radius: 999px;
+        font-size: 11px;
+        font-weight: 700;
+        background: rgba(196, 42, 42, 0.12);
+        color: var(--danger);
+        margin-top: 6px;
+      }
+
+      .chip-row {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 6px;
+        margin-top: 8px;
+      }
+
+      .chip-btn {
+        font-size: 11px;
+        padding: 6px 10px;
+        border-radius: 999px;
+        background: #e9e4db;
+        color: var(--text);
+        border: 1px solid transparent;
+      }
+
+      .chip-btn.is-selected {
+        background: rgba(23, 130, 79, 0.12);
+        border: 1px solid var(--success);
+        color: var(--success);
+      }
+
+      .fix-review-card {
+        border: 1px solid var(--border);
+        border-radius: 16px;
+        background: #ffffff;
+        padding: 14px;
+      }
+
+      .fix-review-card + .fix-review-card {
+        margin-top: 10px;
+      }
+
+      .fix-review-head {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+        gap: 10px;
+      }
+
+      .fix-review-name {
+        font-size: 13px;
+        font-weight: 700;
+        line-height: 1.35;
+        display: -webkit-box;
+        -webkit-line-clamp: 2;
+        -webkit-box-orient: vertical;
+        overflow: hidden;
+      }
+
+      .fix-review-status-icon {
+        flex-shrink: 0;
+        width: 20px;
+        height: 20px;
+      }
+
+      .fix-review-status-icon svg {
+        display: block;
+      }
+
+      .apply-chip-btn {
+        background: var(--success);
+        border: 1px solid var(--success);
+        color: #ffffff;
+        font-size: 12px;
+        font-weight: 700;
+        padding: 8px 14px;
+      }
+
+      .more-toggle-link {
+        background: transparent;
+        color: var(--muted);
+        text-decoration: underline;
+        font-size: 12px;
+        padding: 6px 2px;
+      }
+
+      .more-scopes-panel {
+        margin-top: 8px;
+        padding: 10px 12px;
+        border: 1px solid var(--border);
+        border-radius: 12px;
+        background: #faf7f1;
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+      }
+
+      .more-scopes-option {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        font-size: 12px;
+      }
+
+      .more-scopes-option input {
+        width: 16px;
+        height: 16px;
+        accent-color: var(--success);
+      }
+
       .collapsed .card-body {
         display: none;
       }
@@ -196,9 +355,13 @@
       }
 
       .scope-row {
-        display: grid;
-        grid-template-columns: 1fr 1fr;
+        display: flex;
+        flex-direction: column;
         gap: 8px;
+      }
+
+      .confidence-hint {
+        margin-top: 4px;
       }
 
       select {
@@ -216,20 +379,126 @@
         margin-top: 12px;
       }
 
-      #resultText,
-      #scopeSummaryText {
+      .actions .secondary-btn {
+        flex: 1;
+      }
+
+      .actions .primary-btn {
+        flex: 1;
+      }
+
+      .result-block {
+        margin-top: 12px;
+      }
+
+      .toggle-details {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        width: 100%;
+        margin-top: 8px;
+        text-align: center;
+      }
+
+      .details-panel {
+        margin-top: 8px;
+        padding: 12px;
+        border: 1px solid var(--border);
+        border-radius: 12px;
+        background: #faf7f1;
+      }
+
+      .plain-list-panel {
+        margin-top: 8px;
+      }
+
+      .summary-block {
         white-space: pre-wrap;
         font-size: 13px;
+      }
+
+      .compact-block {
+        margin-top: 10px;
+      }
+
+      .details-list {
+        margin: 6px 0 0;
+        padding-left: 18px;
+      }
+
+      .details-list li {
+        margin-bottom: 6px;
+        word-break: break-word;
+      }
+
+      .case-list {
+        list-style: none;
+        padding-left: 0;
+        margin: 6px 0 0;
+      }
+
+      .library-token-list {
+        list-style: none;
+        padding-left: 0;
+        margin: 6px 0 0;
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+      }
+
+      .library-token-row {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 8px;
+      }
+
+      .library-token-name {
+        font-weight: 700;
+        word-break: break-word;
+      }
+
+      .select-token-btn:disabled {
+        opacity: 0.35;
+        cursor: default;
+      }
+
+      .case-item {
+        display: flex;
+        align-items: flex-start;
+        gap: 10px;
+        margin-bottom: 10px;
+      }
+
+      .case-checkbox {
+        width: 18px;
+        height: 18px;
+        margin-top: 2px;
+      }
+
+      .case-label {
+        flex: 1;
+        font-size: 13px;
+        line-height: 1.4;
+        word-break: break-word;
+      }
+
+      #resultText,
+      #scopeSummaryText {
+        font-size: 13px;
+      }
+
+      #scopeSummaryText {
+        white-space: pre-wrap;
       }
     </style>
   </head>
   <body>
     <div class="app">
       <div id="homeView">
-        <div class="hero">
+        <div class="home-header">
           <div class="section-title">Component Review</div>
           <h1>Extra Review</h1>
-          <p class="subtitle">Выбери, что именно хочешь проверить или исправить в компоненте.</p>
         </div>
 
         <div class="grid">
@@ -238,20 +507,53 @@
             <span class="action-desc">Найти удалённые или потерянные variable bindings у выбранного слоя.</span>
           </button>
 
-          <button class="action-card" data-action="raw-values">
-            <span class="action-title">Найти значения без токенов</span>
-            <span class="action-desc">Показать свойства, где есть значение, но нет token binding.</span>
-          </button>
-
-          <button class="action-card" data-action="scope-review">
-            <span class="action-title">Определить scope</span>
-            <span class="action-desc">Проверить только локальные токены текущего файла.</span>
+          <button class="action-card" data-action="fix-scope">
+            <span class="action-title">Поправить scope</span>
+            <span class="action-desc">Одной кнопкой исправить очевидные несовпадения scope во всех локальных токенах файла и показать список изменений.</span>
           </button>
 
           <button class="action-card" data-action="unused-tokens">
             <span class="action-title">Найти неиспользуемые токены</span>
             <span class="action-desc">Проверить выбранную коллекцию на неиспользуемые токены на странице.</span>
           </button>
+
+          <button class="action-card" data-action="raw-values">
+            <span class="action-title">Применить токен</span>
+            <span class="action-desc">Найти значения без токенов и предложить подходящие токены.</span>
+          </button>
+
+          <button class="action-card" data-action="library-review">
+            <span class="action-title">Определить библиотеку</span>
+            <span class="action-desc">Показать, какие токены и из каких библиотек используются на выбранном объекте.</span>
+          </button>
+        </div>
+      </div>
+
+      <div id="fixScopeView" class="hidden">
+        <div class="hero">
+          <button id="backToHomeFromFixScope" class="back-link">← Extra Review / Fix Scope</button>
+          <h1>Поправить scope</h1>
+          <p class="subtitle">Выбери компонент (учитываются токены из коллекций Size и Theme) и нажми «Поправить scope» — или используй «Исправить всё», чтобы проверить сразу все локальные токены файла.</p>
+          <div class="hero-actions folder-picker-row">
+            <select id="fixScopeFolderSelect" disabled>
+              <option value="">Загрузка папок…</option>
+            </select>
+            <button id="fixScopeFolderButton" class="primary-btn" disabled>Поправить scope</button>
+          </div>
+          <div class="hero-actions">
+            <button id="fixScopeAllButton" class="secondary-btn">Исправить всё</button>
+          </div>
+        </div>
+      </div>
+
+      <div id="libraryView" class="hidden">
+        <div class="hero">
+          <button id="backToHomeFromLibrary" class="back-link">← Extra Review / Library Review</button>
+          <h1>Определить библиотеку</h1>
+          <p class="subtitle">Выдели объект (или несколько) в Figma и нажми «Проверить библиотеки» — в результате будет видно, какие токены и из каких библиотек используются на этом элементе.</p>
+          <div class="hero-actions">
+            <button id="analyzeLibraries" class="primary-btn">Проверить библиотеки</button>
+          </div>
         </div>
       </div>
 
@@ -275,19 +577,62 @@
         <div id="scopeCards" class="cards hidden"></div>
       </div>
 
-      <div class="result">
-        <div class="result-title">Result</div>
-        <div id="resultText">Выбери раздел выше, чтобы запустить проверку.</div>
+      <div id="applyTokenView" class="hidden">
+        <div class="hero">
+          <button id="backToHomeFromApplyToken" class="back-link">← Extra Review / Apply Token</button>
+          <h1>Применить токен</h1>
+          <p class="subtitle">Выбери объекты в Figma и нажми «Найти значения без токенов».</p>
+          <div class="hero-actions">
+            <button id="analyzeApplyTokens" class="primary-btn">Найти значения без токенов</button>
+          </div>
+          <div class="hero-actions hidden" id="ignoredApplyTokenActions">
+            <button id="toggleIgnoredApplyTokens" class="secondary-btn">Показать скрытые</button>
+          </div>
+        </div>
+
+        <div id="applyTokenStatus" class="summary sticky-summary hidden">
+          <div id="applyTokenStatusText"></div>
+        </div>
+
+        <div id="applyTokenCards" class="cards hidden"></div>
+      </div>
+
+      <div class="result hidden" id="globalResult">
+        <div class="result-head">
+          <div class="result-title">Result</div>
+          <button type="button" class="icon-btn" id="copyResultButton" title="Скопировать результат" aria-label="Скопировать результат"></button>
+        </div>
+        <div id="resultText"></div>
       </div>
     </div>
 
     <script>
       const homeView = document.getElementById("homeView");
       const scopeView = document.getElementById("scopeView");
+      const applyTokenView = document.getElementById("applyTokenView");
+      const libraryView = document.getElementById("libraryView");
+      const fixScopeView = document.getElementById("fixScopeView");
       const scopeCards = document.getElementById("scopeCards");
       const scopeSummary = document.getElementById("scopeSummary");
       const scopeSummaryText = document.getElementById("scopeSummaryText");
+      const applyTokenStatus = document.getElementById("applyTokenStatus");
+      const applyTokenStatusText = document.getElementById("applyTokenStatusText");
+      const applyTokenCards = document.getElementById("applyTokenCards");
+      const ignoredApplyTokenActions = document.getElementById("ignoredApplyTokenActions");
+      const toggleIgnoredApplyTokens = document.getElementById("toggleIgnoredApplyTokens");
+      const globalResult = document.getElementById("globalResult");
       const resultText = document.getElementById("resultText");
+      const copyResultButton = document.getElementById("copyResultButton");
+      let brokenPathsExpanded = false;
+      let lastBrokenTokensResult = null;
+      let currentApplyTokenGroups = [];
+      let lastApplyTokenGroups = [];
+      let ignoredApplyTokenGroupIds = new Set();
+      let showIgnoredApplyTokenGroups = false;
+      let lastScopeFixResult = null;
+      let scopeFixChangesExpanded = false;
+      let scopeFixReviewExpanded = false;
+      let lastLibraryReviewResult = null;
 
       function debugLog(label, payload) {
         if (payload === undefined) {
@@ -320,12 +665,89 @@
         debugLog("showHome");
         homeView.classList.remove("hidden");
         scopeView.classList.add("hidden");
+        applyTokenView.classList.add("hidden");
+        libraryView.classList.add("hidden");
+        fixScopeView.classList.add("hidden");
       }
 
       function showScope() {
         debugLog("showScope");
         homeView.classList.add("hidden");
         scopeView.classList.remove("hidden");
+        applyTokenView.classList.add("hidden");
+        libraryView.classList.add("hidden");
+        fixScopeView.classList.add("hidden");
+        globalResult.classList.remove("hidden");
+      }
+
+      function showApplyToken() {
+        debugLog("showApplyToken");
+        homeView.classList.add("hidden");
+        scopeView.classList.add("hidden");
+        applyTokenView.classList.remove("hidden");
+        libraryView.classList.add("hidden");
+        fixScopeView.classList.add("hidden");
+        globalResult.classList.add("hidden");
+      }
+
+      function showLibrary() {
+        debugLog("showLibrary");
+        homeView.classList.add("hidden");
+        scopeView.classList.add("hidden");
+        applyTokenView.classList.add("hidden");
+        libraryView.classList.remove("hidden");
+        fixScopeView.classList.add("hidden");
+        globalResult.classList.add("hidden");
+      }
+
+      function showFixScope() {
+        debugLog("showFixScope");
+        homeView.classList.add("hidden");
+        scopeView.classList.add("hidden");
+        applyTokenView.classList.add("hidden");
+        libraryView.classList.add("hidden");
+        fixScopeView.classList.remove("hidden");
+        globalResult.classList.add("hidden");
+
+        const select = document.getElementById("fixScopeFolderSelect");
+        const folderButton = document.getElementById("fixScopeFolderButton");
+        if (select) {
+          select.innerHTML = '<option value="">Загрузка папок…</option>';
+          select.disabled = true;
+        }
+        if (folderButton) folderButton.disabled = true;
+
+        parent.postMessage({ pluginMessage: { type: "run-list-scope-fix-folders" } }, "*");
+      }
+
+      function renderFixScopeFolderOptions(folders) {
+        const select = document.getElementById("fixScopeFolderSelect");
+        const folderButton = document.getElementById("fixScopeFolderButton");
+        if (!select) return;
+
+        if (!folders || !folders.length) {
+          select.innerHTML = '<option value="">Компоненты не найдены</option>';
+          select.disabled = true;
+          if (folderButton) folderButton.disabled = true;
+          return;
+        }
+
+        select.innerHTML = folders
+          .map((folder) => `<option value="${escapeHtml(folder.folderId)}">${escapeHtml(folder.label)} (${folder.count})</option>`)
+          .join("");
+        select.disabled = false;
+        if (folderButton) folderButton.disabled = false;
+      }
+
+      function setApplyTokenStatus(text) {
+        if (!text) {
+          applyTokenStatus.classList.add("hidden");
+          applyTokenStatusText.textContent = "";
+          return;
+        }
+
+        applyTokenStatus.classList.remove("hidden");
+        applyTokenStatusText.textContent = text;
       }
 
       function getSummaryCounts() {
@@ -427,14 +849,16 @@
 
         const select1 = document.getElementById(`scope1-${variableId}`);
         const select2 = document.getElementById(`scope2-${variableId}`);
+        const select3 = document.getElementById(`scope3-${variableId}`);
 
         debugLog("getSelectedScopes refs", {
           variableId,
           hasSelect1: !!select1,
-          hasSelect2: !!select2
+          hasSelect2: !!select2,
+          hasSelect3: !!select3
         });
 
-        const values = [select1?.value || "", select2?.value || ""]
+        const values = [select1?.value || "", select2?.value || "", select3?.value || ""]
           .filter((value) => value && value !== "NONE");
 
         const result = [...new Set(values)];
@@ -487,19 +911,38 @@
 
           debugLog("second select built", { variableId: item.variableId });
 
+          const thirdOptions = [
+            '<option value="NONE">—</option>',
+            ...item.allowedScopes.map((scope) => {
+              const thirdSelected = item.selectedScopes[2] === scope ? "selected" : "";
+              return `<option value="${scope}" ${thirdSelected}>${scope}</option>`;
+            })
+          ].join("");
+
+          debugLog("third select built", { variableId: item.variableId });
+
           const collapsedClass = item.isScopeMatched ? "collapsed" : "";
+          const confidenceHint =
+            !item.isScopeMatched && item.confidence === "low"
+              ? '<div class="hint confidence-hint">⚠️ Предложение неоднозначное (по статистике похожих токенов совпадает не всегда) — сверьте вручную перед применением.</div>'
+              : "";
+          const legacyBadge = item.isLegacySizeStructure
+            ? '<div class="badge-legacy">Устаревшая структура имени (small/medium/large в пути)</div>'
+            : "";
 
           return `
             <div class="card ${collapsedClass}" id="card-${item.variableId}">
               <div class="token-head">
-                <div class="token-name">${item.variableName}</div>
+                <div class="token-name">${escapeHtml(item.variableName)}</div>
                 <div class="${item.isScopeMatched ? "badge-done" : "badge-review"}" id="badge-${item.variableId}">
                   ${item.isScopeMatched ? "Done" : "Need review"}
                 </div>
               </div>
 
-              <div class="meta" id="current-${item.variableId}">Current scope: ${item.currentScopesText}</div>
-              <div class="meta">Suggested scope: ${item.suggestedScopesText}</div>
+              <div class="meta" id="current-${item.variableId}">Current scope: ${escapeHtml(item.currentScopesText)}</div>
+              <div class="meta">Suggested scope: ${escapeHtml(item.suggestedScopesText)}</div>
+              ${confidenceHint}
+              ${legacyBadge}
 
               <div class="card-body">
                 <div class="scope-row">
@@ -516,9 +959,16 @@
                       ${secondOptions}
                     </select>
                   </div>
+
+                  <div class="row">
+                    <label for="scope3-${item.variableId}">Scope 3</label>
+                    <select id="scope3-${item.variableId}">
+                      ${thirdOptions}
+                    </select>
+                  </div>
                 </div>
 
-                <div class="hint">Во втором поле можно оставить прочерк, если нужен только один scope.</div>
+                <div class="hint">Во втором и третьем поле можно оставить прочерк, если scope'ов нужно меньше.</div>
 
                 <div class="actions">
                   <button class="primary-btn" data-apply-id="${item.variableId}">Apply</button>
@@ -556,14 +1006,772 @@
         debugLog("renderScopeCards listeners attached");
       }
 
+      function getSelectedCandidate(groupId) {
+        const select = document.getElementById(`token-select-${groupId}`);
+        return select ? select.value : "";
+      }
+
+      function getSelectedGroupMembers(groupId) {
+        return Array.from(document.querySelectorAll(`[data-case-group-id="${groupId}"]`))
+          .filter((input) => input.checked)
+          .map((input) => input.getAttribute("data-case-item-id"))
+          .filter(Boolean);
+      }
+
+      function updateGroupSelectionState(groupId) {
+        const group = currentApplyTokenGroups.find((entry) => entry.groupId === groupId);
+        if (!group) return;
+
+        const selectedIds = new Set(getSelectedGroupMembers(groupId));
+        const badge = document.getElementById(`apply-badge-${groupId}`);
+        const applyButton = document.querySelector(`[data-apply-token-group-id="${groupId}"]`);
+
+        if (badge) {
+          if (group.isResolved) {
+            badge.textContent = `Done ${selectedIds.size || group.members.length} cases`;
+            badge.className = "badge-done";
+          } else {
+            badge.textContent = `${selectedIds.size} cases`;
+            badge.className = "badge-review";
+          }
+        }
+
+        if (applyButton) {
+          applyButton.textContent = `Применить на ${selectedIds.size}`;
+        }
+
+        updateApplyTokenButtonState(groupId);
+      }
+
+      function updateApplyTokenButtonState(groupId) {
+        const group = currentApplyTokenGroups.find((entry) => entry.groupId === groupId);
+        if (!group) return;
+
+        const button = document.querySelector(`[data-apply-token-group-id="${groupId}"]`);
+        if (!button) return;
+
+        const selectedVariableId = getSelectedCandidate(groupId);
+        const selectedItemsCount = getSelectedGroupMembers(groupId).length;
+        const isSameAsApplied = !!group.appliedVariableId && group.appliedVariableId === selectedVariableId;
+
+        button.disabled = !selectedVariableId || isSameAsApplied || selectedItemsCount === 0;
+      }
+
+      function applyApplyTokenCardUpdate(groupId) {
+        const group = currentApplyTokenGroups.find((entry) => entry.groupId === groupId);
+        if (!group) return;
+
+        group.isResolved = true;
+        group.appliedVariableId = getSelectedCandidate(groupId);
+
+        const badge = document.getElementById(`apply-badge-${groupId}`);
+
+        if (badge) {
+          badge.textContent = `Done ${group.members.length} cases`;
+          badge.className = "badge-done";
+        }
+
+        updateApplyTokenButtonState(groupId);
+      }
+
+      function renderApplyTokenCards(groups) {
+        lastApplyTokenGroups = groups;
+        currentApplyTokenGroups = groups.filter((group) => {
+          if (showIgnoredApplyTokenGroups) {
+            return true;
+          }
+
+          return !ignoredApplyTokenGroupIds.has(group.groupId);
+        });
+        applyTokenCards.classList.remove("hidden");
+
+        const ignoredCount = groups.filter((group) => ignoredApplyTokenGroupIds.has(group.groupId)).length;
+        if (ignoredCount > 0) {
+          ignoredApplyTokenActions.classList.remove("hidden");
+          toggleIgnoredApplyTokens.textContent = showIgnoredApplyTokenGroups
+            ? `Скрыть скрытые (${ignoredCount})`
+            : `Показать скрытые (${ignoredCount})`;
+        } else {
+          ignoredApplyTokenActions.classList.add("hidden");
+        }
+
+        if (!currentApplyTokenGroups.length) {
+          applyTokenCards.innerHTML = `
+            <div class="card">
+              <div class="meta">На выбранном объекте не найдено значений без токенов.</div>
+            </div>
+          `;
+          return;
+        }
+
+        applyTokenCards.innerHTML = currentApplyTokenGroups.map((group) => {
+          const hasCandidates = group.candidates && group.candidates.length > 0;
+          const isSameAsApplied = !!group.appliedVariableId && group.appliedVariableId === group.selectedVariableId;
+          const options = hasCandidates
+            ? group.candidates.map((candidate) => {
+                const selected = candidate.id === group.selectedVariableId ? "selected" : "";
+                return `<option value="${candidate.id}" ${selected}>${escapeHtml(candidate.name)}</option>`;
+              }).join("")
+            : '<option value="">Подходящих токенов не найдено</option>';
+
+          const firstReason = hasCandidates && group.candidates[0] ? group.candidates[0].reason : "Нет подходящих токенов";
+          const previewPaths = (group.members || [])
+            .map((member) => `
+              <li class="case-item">
+                <input
+                  type="checkbox"
+                  class="case-checkbox"
+                  data-case-group-id="${group.groupId}"
+                  data-case-item-id="${member.itemId}"
+                  checked
+                />
+                <label class="case-label">${escapeHtml(member.nodePath)} / ${escapeHtml(member.propertyLabel || group.propertyLabel)}</label>
+                <button
+                  type="button"
+                  class="icon-btn select-token-btn"
+                  data-select-node-ids='${escapeHtml(JSON.stringify([member.nodeId]))}'
+                  title="Выделить этот слой"
+                  aria-label="Выделить этот слой"
+                >${ICON_TARGET}</button>
+              </li>
+            `)
+            .join("");
+
+          return `
+            <div class="card" id="apply-card-${group.groupId}">
+              <div class="token-head">
+                <div class="token-name">${escapeHtml(group.propertyLabel)}</div>
+                <div class="${hasCandidates ? "badge-review" : "badge-done"}" id="apply-badge-${group.groupId}">
+                  ${group.isResolved ? `Done ${group.members.length} cases` : hasCandidates ? `${group.members.length} cases` : "No match"}
+                </div>
+              </div>
+
+              <div class="meta">Value: ${escapeHtml(group.rawValueText)}</div>
+
+              <div class="card-body">
+                <div class="row">
+                  <div class="section-title">Примеры</div>
+                  <ul class="case-list">
+                    ${previewPaths}
+                  </ul>
+                </div>
+
+                <div class="row">
+                  <label for="token-select-${group.groupId}">Подходящий токен</label>
+                  <select id="token-select-${group.groupId}" ${hasCandidates ? "" : "disabled"}>
+                    ${options}
+                  </select>
+                </div>
+
+                <div class="hint">${escapeHtml(firstReason)}</div>
+
+                <div class="actions">
+                  <button class="primary-btn" data-apply-token-group-id="${group.groupId}" ${hasCandidates && !isSameAsApplied ? "" : "disabled"}>
+                    Применить на ${group.members.length}
+                  </button>
+                  <button class="secondary-btn" data-ignore-token-group-id="${group.groupId}">
+                    Игнорировать
+                  </button>
+                </div>
+              </div>
+            </div>
+          `;
+        }).join("");
+
+        wireSelectNodeIdButtons();
+
+        document.querySelectorAll("[data-apply-token-group-id]").forEach((button) => {
+          button.addEventListener("click", () => {
+            const groupId = button.getAttribute("data-apply-token-group-id");
+            const group = currentApplyTokenGroups.find((entry) => entry.groupId === groupId);
+
+            if (!group) return;
+
+            const variableId = getSelectedCandidate(group.groupId);
+            if (!variableId) return;
+            const selectedItemIds = new Set(getSelectedGroupMembers(group.groupId));
+            if (!selectedItemIds.size) return;
+
+            parent.postMessage(
+              {
+                pluginMessage: {
+                  type: "apply-all-tokens",
+                  updates: group.members
+                    .filter((member) => selectedItemIds.has(member.itemId))
+                    .map((member) => ({
+                    groupId: group.groupId,
+                    itemId: member.itemId,
+                    nodeId: member.nodeId,
+                    variableId,
+                    target: member.target
+                    }))
+                }
+              },
+              "*"
+            );
+          });
+        });
+
+        document.querySelectorAll("[id^='token-select-group-'], [id^='token-select-']").forEach((select) => {
+          select.addEventListener("change", () => {
+            const groupId = select.id.replace("token-select-", "");
+            const group = currentApplyTokenGroups.find((entry) => entry.groupId === groupId);
+            if (!group) return;
+
+            group.selectedVariableId = select.value;
+            updateApplyTokenButtonState(groupId);
+          });
+        });
+
+        document.querySelectorAll("[data-case-group-id]").forEach((input) => {
+          input.addEventListener("change", () => {
+            const groupId = input.getAttribute("data-case-group-id");
+            if (!groupId) return;
+
+            updateGroupSelectionState(groupId);
+          });
+        });
+
+        document.querySelectorAll("[data-ignore-token-group-id]").forEach((button) => {
+          button.addEventListener("click", () => {
+            const groupId = button.getAttribute("data-ignore-token-group-id");
+            if (!groupId) return;
+
+            ignoredApplyTokenGroupIds.add(groupId);
+            renderApplyTokenCards(lastApplyTokenGroups);
+            setApplyTokenStatus("Кейс скрыт из текущего списка.");
+          });
+        });
+
+        currentApplyTokenGroups.forEach((group) => {
+          updateGroupSelectionState(group.groupId);
+        });
+      }
+
+      function escapeHtml(value) {
+        return String(value)
+          .replaceAll("&", "&amp;")
+          .replaceAll("<", "&lt;")
+          .replaceAll(">", "&gt;")
+          .replaceAll('"', "&quot;")
+          .replaceAll("'", "&#39;");
+      }
+
+      function renderBrokenTokenPath(path) {
+        const nodeId = path && path.nodeId ? path.nodeId : "";
+        const text = path && path.text ? path.text : "";
+        const variableName = path && path.variableName ? path.variableName : "";
+        const nodeIds = nodeId ? [nodeId] : [];
+        const disabled = nodeIds.length ? "" : "disabled";
+        const title = nodeIds.length ? "Выделить этот слой" : "Слой недоступен";
+
+        return `
+          <li class="library-token-row">
+            <span class="library-token-name">${escapeHtml(text)}</span>
+            <button
+              type="button"
+              class="icon-btn select-token-btn"
+              data-select-node-ids='${escapeHtml(JSON.stringify(nodeIds))}'
+              data-copy-name="${escapeHtml(variableName)}"
+              title="${escapeHtml(title)}"
+              aria-label="${escapeHtml(title)}"
+              ${disabled}
+            >${ICON_TARGET}</button>
+          </li>
+        `;
+      }
+
+      function renderBrokenTokensResult(data) {
+        lastBrokenTokensResult = data;
+
+        const details = Array.isArray(data.details) ? data.details : [];
+        const paths = Array.isArray(data.paths) ? data.paths : [];
+        const hasPaths = paths.length > 0;
+
+        const detailsHtml = details.length
+          ? `
+              <div class="result-block compact-block">
+                <div class="section-title">Детали</div>
+                <ul class="details-list">
+                  ${details.map((detail) => `<li>${escapeHtml(detail)}</li>`).join("")}
+                </ul>
+              </div>
+            `
+          : "";
+
+        const pathsHtml = hasPaths
+          ? `
+              <div class="result-block compact-block">
+                <div class="section-title">Сломанные токены</div>
+                <button id="toggleBrokenPaths" class="secondary-btn toggle-details">
+                  ${brokenPathsExpanded ? "Скрыть подробности" : "Показать подробности"}
+                </button>
+                <div class="plain-list-panel ${brokenPathsExpanded ? "" : "hidden"}" id="brokenPathsPanel">
+                  <div class="section-title">Где найдено</div>
+                  <ul class="library-token-list">
+                    ${paths.map(renderBrokenTokenPath).join("")}
+                  </ul>
+                </div>
+              </div>
+            `
+          : "";
+
+        resultText.innerHTML = `
+          <div class="summary-block">${escapeHtml(data.summary || "")}</div>
+          ${detailsHtml}
+          ${pathsHtml}
+        `;
+
+        wireSelectNodeIdButtons();
+
+        const toggleButton = document.getElementById("toggleBrokenPaths");
+        if (toggleButton) {
+          toggleButton.addEventListener("click", () => {
+            brokenPathsExpanded = !brokenPathsExpanded;
+            renderBrokenTokensResult(lastBrokenTokensResult || data);
+          });
+        }
+      }
+
+      function renderScopeFixChangeEntry(change) {
+        const legacyBadge = change.isLegacySizeStructure
+          ? '<span class="badge-legacy">legacy</span> '
+          : "";
+        return `<li>${legacyBadge}<strong>${escapeHtml(change.variableName)}</strong>: ${escapeHtml(change.fromScopesText)} → ${escapeHtml(change.toScopesText)}</li>`;
+      }
+
+      const ICON_INFO = `
+        <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <circle cx="10" cy="10" r="8.5" stroke="#9a6b16" stroke-width="1.4"/>
+          <rect x="9.15" y="8.4" width="1.7" height="5.6" rx="0.85" fill="#9a6b16"/>
+          <rect x="9.15" y="5.3" width="1.7" height="1.7" rx="0.85" fill="#9a6b16"/>
+        </svg>
+      `;
+      const ICON_APPLIED = `
+        <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <circle cx="10" cy="10" r="9" fill="#b9b2a4"/>
+          <path d="M6 10.2L8.6 12.8L14 7.2" stroke="white" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+      `;
+      const ICON_COPY = `
+        <svg width="18" height="18" viewBox="0 0 18 18" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <rect x="6.5" y="6.5" width="9" height="9" rx="1.5" stroke="#9a6b16" stroke-width="1.3"/>
+          <path d="M4 11.5H3.5C2.67157 11.5 2 10.8284 2 10V3.5C2 2.67157 2.67157 2 3.5 2H10C10.8284 2 11.5 2.67157 11.5 3.5V4" stroke="#9a6b16" stroke-width="1.3" stroke-linecap="round"/>
+        </svg>
+      `;
+      const ICON_COPIED = `
+        <svg width="18" height="18" viewBox="0 0 18 18" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <path d="M3.5 9.5L7 13L14.5 4.5" stroke="#17824f" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+      `;
+      // Mirrors Figma's own "Select N using this color" target icon in Selection colors.
+      const ICON_TARGET = `
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <circle cx="8" cy="8" r="6.3" stroke="#9a6b16" stroke-width="1.3"/>
+          <circle cx="8" cy="8" r="2.2" stroke="#9a6b16" stroke-width="1.3"/>
+        </svg>
+      `;
+
+      if (copyResultButton) {
+        copyResultButton.innerHTML = ICON_COPY;
+      }
+
+      function copyTextToClipboard(text) {
+        if (!text) return false;
+
+        const textarea = document.createElement("textarea");
+        textarea.value = text;
+        textarea.style.position = "fixed";
+        textarea.style.opacity = "0";
+        document.body.appendChild(textarea);
+        textarea.focus();
+        textarea.select();
+
+        let ok = false;
+        try {
+          document.execCommand("copy");
+          ok = true;
+        } catch (error) {
+          debugLog("copy failed", error);
+        }
+
+        document.body.removeChild(textarea);
+        return ok;
+      }
+
+      function copyResultToClipboard() {
+        const text = (resultText.innerText || resultText.textContent || "").trim();
+        if (!text) return;
+
+        if (copyTextToClipboard(text)) {
+          debugLog("copy result: ok");
+          if (copyResultButton) {
+            copyResultButton.innerHTML = ICON_COPIED;
+            copyResultButton.title = "Скопировано";
+            setTimeout(() => {
+              copyResultButton.innerHTML = ICON_COPY;
+              copyResultButton.title = "Скопировать результат";
+            }, 1200);
+          }
+        }
+      }
+
+      if (copyResultButton) {
+        copyResultButton.addEventListener("click", copyResultToClipboard);
+      }
+
+      function sameScopeArrays(a, b) {
+        if (a.length !== b.length) return false;
+        const left = [...a].sort();
+        const right = [...b].sort();
+        return left.every((value, index) => value === right[index]);
+      }
+
+      function findFixReviewEntry(variableId) {
+        if (!lastScopeFixResult || !Array.isArray(lastScopeFixResult.needsReview)) return null;
+        return lastScopeFixResult.needsReview.find((entry) => entry.variableId === variableId) || null;
+      }
+
+      function toggleFixReviewScope(variableId, scope, forceValue) {
+        const entry = findFixReviewEntry(variableId);
+        if (!entry) return;
+        if (!entry.selectedScopes) entry.selectedScopes = [];
+
+        const hasScope = entry.selectedScopes.includes(scope);
+        const shouldSelect = typeof forceValue === "boolean" ? forceValue : !hasScope;
+
+        if (shouldSelect && !hasScope) {
+          entry.selectedScopes.push(scope);
+        } else if (!shouldSelect && hasScope) {
+          entry.selectedScopes = entry.selectedScopes.filter((existing) => existing !== scope);
+        }
+
+        renderScopeFixResult(lastScopeFixResult);
+      }
+
+      function renderScopeFixReviewEntry(entry) {
+        if (!entry.selectedScopes) entry.selectedScopes = [];
+        if (entry.appliedScopes === undefined) entry.appliedScopes = null;
+        if (entry.moreExpanded === undefined) entry.moreExpanded = false;
+
+        const legacyBadge = entry.isLegacySizeStructure
+          ? '<div class="badge-legacy">Устаревшая структура имени (small/medium/large в пути)</div>'
+          : "";
+
+        const quickScopes = Array.isArray(entry.quickScopes) ? entry.quickScopes : [];
+        const allowedScopes = Array.isArray(entry.allowedScopes) ? entry.allowedScopes : [];
+
+        // Chips and the full checklist are two views of the same choice — show only one
+        // at a time instead of both.
+        const optionsHtml = entry.moreExpanded
+          ? `
+              <div class="more-scopes-panel">
+                ${allowedScopes
+                  .map((scope) => {
+                    const checked = entry.selectedScopes.includes(scope);
+                    return `
+                      <label class="more-scopes-option">
+                        <input type="checkbox" data-fix-scope-checkbox="${entry.variableId}" data-scope="${scope}" ${checked ? "checked" : ""} />
+                        ${escapeHtml(scope)}
+                      </label>
+                    `;
+                  })
+                  .join("")}
+                <button type="button" class="more-toggle-link" data-fix-more-toggle="${entry.variableId}">скрыть</button>
+              </div>
+            `
+          : `
+              <div class="chip-row">
+                ${quickScopes
+                  .map((scope) => {
+                    const selected = entry.selectedScopes.includes(scope);
+                    return `
+                      <button
+                        type="button"
+                        class="chip-btn ${selected ? "is-selected" : ""}"
+                        data-fix-scope-toggle="${entry.variableId}"
+                        data-scope="${scope}"
+                      >${escapeHtml(scope)}</button>
+                    `;
+                  })
+                  .join("")}
+                <button type="button" class="more-toggle-link" data-fix-more-toggle="${entry.variableId}">more...</button>
+              </div>
+            `;
+
+        const hasSelection = entry.selectedScopes.length > 0;
+        const isDirty = !entry.appliedScopes || !sameScopeArrays(entry.selectedScopes, entry.appliedScopes);
+        const showApply = hasSelection && isDirty;
+
+        return `
+          <li class="fix-review-card" id="fix-review-${entry.variableId}">
+            <div class="fix-review-head">
+              <div class="fix-review-name">${escapeHtml(entry.variableName)}</div>
+              <div class="fix-review-status-icon">${entry.appliedScopes ? ICON_APPLIED : ICON_INFO}</div>
+            </div>
+            <div class="meta">Current: ${escapeHtml(entry.currentScopesText)}</div>
+            ${legacyBadge}
+            ${optionsHtml}
+            ${
+              showApply
+                ? `<div class="actions"><button type="button" class="apply-chip-btn" data-fix-apply="${entry.variableId}">Apply</button></div>`
+                : ""
+            }
+          </li>
+        `;
+      }
+
+      function renderScopeFixResult(data) {
+        lastScopeFixResult = data;
+
+        const changes = Array.isArray(data.changes) ? data.changes : [];
+        const needsReview = Array.isArray(data.needsReview) ? data.needsReview : [];
+
+        const changesHtml = changes.length
+          ? `
+              <div class="result-block compact-block">
+                <div class="section-title">Исправлено автоматически (${changes.length})</div>
+                <button id="toggleScopeFixChanges" class="secondary-btn toggle-details">
+                  ${scopeFixChangesExpanded ? "Скрыть список" : "Показать список"}
+                </button>
+                <div class="plain-list-panel ${scopeFixChangesExpanded ? "" : "hidden"}" id="scopeFixChangesPanel">
+                  <ul class="details-list">
+                    ${changes.map(renderScopeFixChangeEntry).join("")}
+                  </ul>
+                </div>
+              </div>
+            `
+          : "";
+
+        const needsReviewHtml = needsReview.length
+          ? `
+              <div class="result-block compact-block">
+                <div class="section-title">Нужна ручная проверка (${needsReview.length})</div>
+                <button id="toggleScopeFixReview" class="secondary-btn toggle-details">
+                  ${scopeFixReviewExpanded ? "Скрыть список" : "Показать список"}
+                </button>
+                <div class="plain-list-panel ${scopeFixReviewExpanded ? "" : "hidden"}" id="scopeFixReviewPanel">
+                  <ul class="case-list">
+                    ${needsReview.map(renderScopeFixReviewEntry).join("")}
+                  </ul>
+                </div>
+              </div>
+            `
+          : "";
+
+        resultText.innerHTML = `
+          <div class="summary-block">${escapeHtml(data.summary || "")}</div>
+          ${changesHtml}
+          ${needsReviewHtml}
+        `;
+
+        const toggleChangesButton = document.getElementById("toggleScopeFixChanges");
+        if (toggleChangesButton) {
+          toggleChangesButton.addEventListener("click", () => {
+            scopeFixChangesExpanded = !scopeFixChangesExpanded;
+            renderScopeFixResult(lastScopeFixResult || data);
+          });
+        }
+
+        const toggleReviewButton = document.getElementById("toggleScopeFixReview");
+        if (toggleReviewButton) {
+          toggleReviewButton.addEventListener("click", () => {
+            scopeFixReviewExpanded = !scopeFixReviewExpanded;
+            renderScopeFixResult(lastScopeFixResult || data);
+          });
+        }
+
+        document.querySelectorAll("[data-fix-scope-toggle]").forEach((button) => {
+          button.addEventListener("click", () => {
+            const variableId = button.getAttribute("data-fix-scope-toggle");
+            const scope = button.getAttribute("data-scope");
+            if (!variableId || !scope) return;
+            toggleFixReviewScope(variableId, scope);
+          });
+        });
+
+        document.querySelectorAll("[data-fix-scope-checkbox]").forEach((checkbox) => {
+          checkbox.addEventListener("change", () => {
+            const variableId = checkbox.getAttribute("data-fix-scope-checkbox");
+            const scope = checkbox.getAttribute("data-scope");
+            if (!variableId || !scope) return;
+            toggleFixReviewScope(variableId, scope, checkbox.checked);
+          });
+        });
+
+        document.querySelectorAll("[data-fix-more-toggle]").forEach((button) => {
+          button.addEventListener("click", () => {
+            const variableId = button.getAttribute("data-fix-more-toggle");
+            const entry = findFixReviewEntry(variableId);
+            if (!entry) return;
+            entry.moreExpanded = !entry.moreExpanded;
+            renderScopeFixResult(lastScopeFixResult);
+          });
+        });
+
+        document.querySelectorAll("[data-fix-apply]").forEach((button) => {
+          button.addEventListener("click", () => {
+            const variableId = button.getAttribute("data-fix-apply");
+            const entry = findFixReviewEntry(variableId);
+            if (!entry || !entry.selectedScopes.length) return;
+
+            parent.postMessage(
+              {
+                pluginMessage: {
+                  type: "apply-scope",
+                  variableId,
+                  scopes: entry.selectedScopes
+                }
+              },
+              "*"
+            );
+          });
+        });
+      }
+
+      function markScopeFixReviewResolved(variableId, scopes) {
+        const entry = findFixReviewEntry(variableId);
+        if (!entry) return;
+
+        entry.appliedScopes = [...scopes];
+        entry.selectedScopes = [...scopes];
+        renderScopeFixResult(lastScopeFixResult);
+      }
+
+      function pluralizeLayers(count) {
+        const mod10 = count % 10;
+        const mod100 = count % 100;
+        if (mod10 === 1 && mod100 !== 11) return "слой";
+        if (mod10 >= 2 && mod10 <= 4 && (mod100 < 12 || mod100 > 14)) return "слоя";
+        return "слоёв";
+      }
+
+      function renderLibraryUsageToken(token) {
+        const nodeIds = Array.isArray(token.nodeIds) ? token.nodeIds : [];
+        const count = nodeIds.length;
+        const disabled = count ? "" : "disabled";
+        const title = count
+          ? `Выделить ${count} ${pluralizeLayers(count)} с этим токеном`
+          : "Нет доступных слоёв для выделения";
+
+        return `
+          <li class="library-token-row">
+            <span class="library-token-name">${escapeHtml(token.variableName)}</span>
+            <button
+              type="button"
+              class="icon-btn select-token-btn"
+              data-select-node-ids='${escapeHtml(JSON.stringify(nodeIds))}'
+              data-copy-name="${escapeHtml(token.variableName || "")}"
+              title="${escapeHtml(title)}"
+              aria-label="${escapeHtml(title)}"
+              ${disabled}
+            >${ICON_TARGET}</button>
+          </li>
+        `;
+      }
+
+      function renderLibraryGroup(group) {
+        if (group.expanded === undefined) group.expanded = false;
+
+        const tokens = Array.isArray(group.tokens) ? group.tokens : [];
+
+        return `
+          <div class="result-block compact-block">
+            <div class="section-title">${escapeHtml(group.libraryLabel)} (${tokens.length})</div>
+            <button type="button" class="secondary-btn toggle-details" data-library-group-toggle="${group.groupId}">
+              ${group.expanded ? "Скрыть список" : "Показать список"}
+            </button>
+            <div class="plain-list-panel ${group.expanded ? "" : "hidden"}">
+              <ul class="library-token-list">
+                ${tokens.map(renderLibraryUsageToken).join("")}
+              </ul>
+            </div>
+          </div>
+        `;
+      }
+
+      function renderLibraryReviewResult(data) {
+        lastLibraryReviewResult = data;
+
+        const groups = Array.isArray(data.groups) ? data.groups : [];
+
+        resultText.innerHTML = `
+          <div class="summary-block">${escapeHtml(data.summary || "")}</div>
+          ${groups.map(renderLibraryGroup).join("")}
+        `;
+
+        document.querySelectorAll("[data-library-group-toggle]").forEach((button) => {
+          button.addEventListener("click", () => {
+            const groupId = button.getAttribute("data-library-group-toggle");
+            const group = (lastLibraryReviewResult.groups || []).find((g) => g.groupId === groupId);
+            if (!group) return;
+            group.expanded = !group.expanded;
+            renderLibraryReviewResult(lastLibraryReviewResult);
+          });
+        });
+
+        wireSelectNodeIdButtons();
+      }
+
+      // Wires up every "select these node ids on canvas" icon button currently in the
+      // DOM — shared by the library review list and the Apply Token examples list.
+      // Safe to call after any innerHTML update; re-queries fresh each time.
+      function wireSelectNodeIdButtons() {
+        document.querySelectorAll("[data-select-node-ids]").forEach((button) => {
+          button.addEventListener("click", () => {
+            const raw = button.getAttribute("data-select-node-ids");
+            if (!raw) return;
+
+            let nodeIds = [];
+            try {
+              nodeIds = JSON.parse(raw);
+            } catch (error) {
+              debugLog("select-nodes parse failed", error);
+              return;
+            }
+
+            if (!nodeIds.length) return;
+
+            debugLog("select-nodes click", { count: nodeIds.length });
+            parent.postMessage({ pluginMessage: { type: "select-nodes", nodeIds } }, "*");
+
+            // Figma's Plugin API has no way to open the native Variables panel with a
+            // token pre-selected — so alongside selecting the layer, copy the token's
+            // full name to the clipboard for a quick paste into that panel's own search.
+            const copyName = button.getAttribute("data-copy-name");
+            if (copyName && copyTextToClipboard(copyName)) {
+              const originalTitle = button.getAttribute("data-original-title") || button.title;
+              button.setAttribute("data-original-title", originalTitle);
+              const originalIcon = button.innerHTML;
+              button.innerHTML = ICON_COPIED;
+              button.title = "Имя токена скопировано";
+              setTimeout(() => {
+                button.innerHTML = originalIcon;
+                button.title = originalTitle;
+              }, 1200);
+            }
+          });
+        });
+      }
+
       document.querySelectorAll(".action-card").forEach((button) => {
         button.addEventListener("click", () => {
           const action = button.dataset.action;
           debugLog("home action click", { action });
 
-          if (action === "scope-review") {
-            showScope();
-            resultText.textContent = "Открылся раздел Scope Review.";
+          if (action === "raw-values") {
+            showApplyToken();
+            resultText.textContent = "Открылся раздел Apply Token.";
+            return;
+          }
+
+          if (action === "fix-scope") {
+            showFixScope();
+            return;
+          }
+
+          if (action === "library-review") {
+            showLibrary();
             return;
           }
 
@@ -579,6 +1787,61 @@
       document.getElementById("analyzeScopes").addEventListener("click", () => {
         debugLog("analyzeScopes click");
         parent.postMessage({ pluginMessage: { type: "run-scope-review" } }, "*");
+      });
+
+      document.getElementById("backToHomeFromApplyToken").addEventListener("click", () => {
+        debugLog("back from apply token click");
+        showHome();
+      });
+
+      document.getElementById("analyzeApplyTokens").addEventListener("click", () => {
+        debugLog("analyzeApplyTokens click");
+        parent.postMessage({ pluginMessage: { type: "run-apply-token-review" } }, "*");
+      });
+
+      document.getElementById("backToHomeFromLibrary").addEventListener("click", () => {
+        debugLog("back from library click");
+        showHome();
+      });
+
+      document.getElementById("analyzeLibraries").addEventListener("click", () => {
+        debugLog("analyzeLibraries click");
+        globalResult.classList.remove("hidden");
+        resultText.textContent = "Проверяю библиотеки токенов на выбранном объекте…";
+        parent.postMessage({ pluginMessage: { type: "run-library-review" } }, "*");
+      });
+
+      document.getElementById("backToHomeFromFixScope").addEventListener("click", () => {
+        debugLog("back from fix scope click");
+        showHome();
+      });
+
+      document.getElementById("fixScopeFolderButton").addEventListener("click", () => {
+        const select = document.getElementById("fixScopeFolderSelect");
+        const folderId = select && select.value ? select.value : "";
+        if (!folderId) return;
+
+        debugLog("fixScopeFolderButton click", { folderId });
+        globalResult.classList.remove("hidden");
+        resultText.textContent = `Проверяю и исправляю scope у токенов папки «${folderId}»…`;
+        parent.postMessage({ pluginMessage: { type: "run-fix-scope", folderId } }, "*");
+      });
+
+      document.getElementById("fixScopeAllButton").addEventListener("click", () => {
+        debugLog("fixScopeAllButton click");
+        globalResult.classList.remove("hidden");
+        resultText.textContent = "Проверяю и исправляю scope у всех локальных токенов файла…";
+        parent.postMessage({ pluginMessage: { type: "run-fix-scope" } }, "*");
+      });
+
+      toggleIgnoredApplyTokens.addEventListener("click", () => {
+        showIgnoredApplyTokenGroups = !showIgnoredApplyTokenGroups;
+        renderApplyTokenCards(lastApplyTokenGroups);
+        setApplyTokenStatus(
+          showIgnoredApplyTokenGroups
+            ? "Скрытые кейсы показаны."
+            : "Скрытые кейсы скрыты."
+        );
       });
 
       document.getElementById("applyAll").addEventListener("click", () => {
@@ -611,7 +1874,40 @@
         if (!msg) return;
 
         if (msg.type === "analysis-result") {
+          brokenPathsExpanded = false;
+          lastBrokenTokensResult = null;
+          globalResult.classList.remove("hidden");
           resultText.textContent = msg.text;
+        }
+
+        if (msg.type === "broken-tokens-result") {
+          brokenPathsExpanded = false;
+          globalResult.classList.remove("hidden");
+          renderBrokenTokensResult(msg);
+        }
+
+        if (msg.type === "scope-fix-result") {
+          globalResult.classList.remove("hidden");
+          scopeFixChangesExpanded = false;
+          scopeFixReviewExpanded = false;
+          renderScopeFixResult(msg);
+        }
+
+        if (msg.type === "scope-fix-folders-result") {
+          renderFixScopeFolderOptions(msg.folders);
+        }
+
+        if (msg.type === "library-review-result") {
+          globalResult.classList.remove("hidden");
+          renderLibraryReviewResult(msg);
+        }
+
+        if (msg.type === "select-nodes-result") {
+          if (msg.error) {
+            debugLog("select-nodes-result error", msg.error);
+          } else {
+            debugLog("select-nodes-result ok", { selectedCount: msg.selectedCount });
+          }
         }
 
         if (msg.type === "scope-review-result") {
@@ -625,22 +1921,46 @@
           debugLog("scope-review-result done");
         }
 
+        if (msg.type === "apply-token-review-result") {
+          showApplyToken();
+          ignoredApplyTokenGroupIds = new Set();
+          showIgnoredApplyTokenGroups = false;
+          setApplyTokenStatus("Проверка значений без токенов выполнена.");
+          renderApplyTokenCards(msg.groups || []);
+        }
+
         if (msg.type === "apply-result") {
           debugLog("apply-result start", msg);
           resultText.textContent = msg.text;
 
           if (msg.variableId && Array.isArray(msg.scopes)) {
             applyCardUpdate(msg.variableId, msg.scopes);
+            markScopeFixReviewResolved(msg.variableId, msg.scopes);
           }
 
           if (Array.isArray(msg.updates)) {
             msg.updates.forEach((update) => {
               applyCardUpdate(update.variableId, update.scopes);
+              markScopeFixReviewResolved(update.variableId, update.scopes);
             });
           }
 
           debugLog("apply-result done");
         }
+
+        if (msg.type === "apply-all-tokens-result") {
+          debugLog("apply-all-tokens-result start", msg);
+          setApplyTokenStatus(msg.text);
+
+          if (Array.isArray(msg.groupIds)) {
+            msg.groupIds.forEach((groupId) => {
+              applyApplyTokenCardUpdate(groupId);
+            });
+          }
+
+          debugLog("apply-all-tokens-result done");
+        }
+
       };
     </script>
   </body>
