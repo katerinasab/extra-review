@@ -35,6 +35,7 @@ type RuntimeVariableLike = {
 type RuntimeVariableCollectionLike = {
   id: string;
   name?: string;
+  key?: string;
 };
 
 type ScopeReviewItem = {
@@ -100,10 +101,16 @@ type LibraryReviewResult = {
   groups: LibraryUsageGroup[];
 };
 
+type BrokenTokenPath = {
+  text: string;
+  nodeId: string;
+  variableName: string;
+};
+
 type BrokenTokensResult = {
   summary: string;
   details: string[];
-  paths: string[];
+  paths: BrokenTokenPath[];
 };
 
 type ApplyTokenTarget =
@@ -1471,6 +1478,181 @@ async function buildLibraryReview(): Promise<LibraryReviewResult> {
   return { summary: summary, groups: groups };
 }
 
+type AliasChainCheck = { broken: boolean; reason: string };
+
+// figma.variables.getVariableByIdAsync happily returns a cached/stale object for a
+// remote variable that was deleted from its source library — it does NOT throw. The
+// only way to tell "this exact variable was removed from Foundation" from "this
+// variable is fine, just in a library we don't currently have enabled" is to check the
+// library's OWN published variable list by key. Memoized per collection since one
+// collection (e.g. a theme-switcher) can be checked against by hundreds of tokens.
+async function getLibraryVariableKeys(
+  collectionKey: string,
+  memo: Map<string, Promise<Set<string> | null>>
+): Promise<Set<string> | null> {
+  const cached = memo.get(collectionKey);
+  if (cached) {
+    return cached;
+  }
+
+  const promise = (async function (): Promise<Set<string> | null> {
+    try {
+      const libraryVariables = await figma.teamLibrary.getVariablesInLibraryCollectionAsync(collectionKey);
+      return new Set(libraryVariables.map(function (entry) {
+        return entry.key;
+      }));
+    } catch (error) {
+      // Can't reach this library right now (not enabled, no access, request failed) —
+      // return null so the caller treats this as "unknown", not "deleted".
+      return null;
+    }
+  })();
+
+  memo.set(collectionKey, promise);
+  return promise;
+}
+
+// Walks a variable's ENTIRE alias chain, not just one hop. A local token often aliases
+// to a token in an intermediate library (e.g. a theme-switcher collection), which in
+// turn aliases to a foundation/palette library. When the foundation library renames or
+// deletes a token, the break happens at that deeper link — the intermediate variable
+// still "exists" (its own id resolves fine), so a shallow one-hop check misses it
+// entirely. This is exactly the "changed in Foundation, doesn't arrive locally"
+// scenario: the alias silently dangles a hop or two down, invisible until a developer
+// pulls the token and gets nothing.
+async function checkVariableChain(
+  variableId: string,
+  localVariableIds: Set<string>,
+  availableCollectionKeys: Set<string>,
+  libraryVariableKeysMemo: Map<string, Promise<Set<string> | null>>,
+  memo: Map<string, Promise<AliasChainCheck>>,
+  visited: Set<string>,
+  depth: number
+): Promise<AliasChainCheck> {
+  if (visited.has(variableId) || depth > 12) {
+    // Cycle guard / runaway-depth backstop — not itself what we're detecting.
+    return { broken: false, reason: "" };
+  }
+
+  const cached = memo.get(variableId);
+  if (cached) {
+    return cached;
+  }
+
+  const promise = (async function (): Promise<AliasChainCheck> {
+    let variable: RuntimeVariableLike | null;
+
+    try {
+      variable = (await figma.variables.getVariableByIdAsync(variableId)) as RuntimeVariableLike | null;
+    } catch (error) {
+      return { broken: true, reason: "Переменная не найдена" };
+    }
+
+    if (!variable) {
+      return { broken: true, reason: "Переменная не найдена" };
+    }
+
+    if (variable.remote === false && !localVariableIds.has(variableId)) {
+      return {
+        broken: true,
+        reason: "\"" + (variable.name || variableId) + "\" (локальная переменная удалена)"
+      };
+    }
+
+    let collectionName = "Unknown";
+    let collectionKey = "";
+
+    try {
+      const collection = await figma.variables.getVariableCollectionByIdAsync(variable.variableCollectionId || "");
+
+      if (!collection) {
+        return {
+          broken: true,
+          reason: "\"" + (variable.name || variableId) + "\" (коллекция удалена)"
+        };
+      }
+
+      const runtimeCollection = collection as RuntimeVariableCollectionLike;
+      collectionName = runtimeCollection.name || "Unknown";
+      collectionKey = runtimeCollection.key || "";
+    } catch (error) {
+      return {
+        broken: true,
+        reason: "\"" + (variable.name || variableId) + "\" (коллекция недоступна)"
+      };
+    }
+
+    if (variable.remote === true) {
+      if (!variable.key) {
+        return {
+          broken: true,
+          reason: "\"" + (variable.name || variableId) + "\" (библиотека отключена)"
+        };
+      }
+
+      // Only check per-variable presence for collections we can actually see — a
+      // collection whose library isn't enabled here returns an EMPTY list (not an
+      // error), which would otherwise look identical to "every variable was deleted".
+      // Skipping it keeps this from re-flagging things like an unused alternate-brand
+      // mode that simply isn't enabled in this file.
+      if (collectionKey && availableCollectionKeys.has(collectionKey)) {
+        const libraryVariableKeys = await getLibraryVariableKeys(collectionKey, libraryVariableKeysMemo);
+
+        if (libraryVariableKeys && !libraryVariableKeys.has(variable.key)) {
+          return {
+            broken: true,
+            reason:
+              "\"" +
+              (variable.name || variableId) +
+              "\" из \"" +
+              collectionName +
+              "\" (удалён или переименован в библиотеке — обновление из Foundation не подтянуто сюда)"
+          };
+        }
+      }
+    }
+
+    const nextVisited = new Set(visited);
+    nextVisited.add(variableId);
+
+    const valuesByMode = variable.valuesByMode || {};
+
+    for (const value of Object.values(valuesByMode)) {
+      if (!isAliasLike(value)) {
+        continue;
+      }
+
+      const nested = await checkVariableChain(
+        value.id,
+        localVariableIds,
+        availableCollectionKeys,
+        libraryVariableKeysMemo,
+        memo,
+        nextVisited,
+        depth + 1
+      );
+
+      if (nested.broken) {
+        return {
+          broken: true,
+          reason:
+            "\"" +
+            (variable.name || variableId) +
+            "\" из \"" +
+            collectionName +
+            "\" → цепочка алиасов ведёт к недоступному токену: " +
+            nested.reason
+        };
+      }
+    }
+
+    return { broken: false, reason: "" };
+  })();
+
+  memo.set(variableId, promise);
+  return promise;
+}
+
 async function buildBrokenTokensReport(): Promise<BrokenTokensResult> {
   const selectedRoots = getSelectedRoots();
 
@@ -1485,6 +1667,7 @@ async function buildBrokenTokensReport(): Promise<BrokenTokensResult> {
   const references: Array<{
     path: string;
     variableId: string;
+    nodeId: string;
   }> = [];
 
   for (const root of selectedRoots) {
@@ -1501,7 +1684,8 @@ async function buildBrokenTokensReport(): Promise<BrokenTokensResult> {
       nodeReferences.forEach(function (reference) {
         references.push({
           path: nodePath + "/" + getReadablePropertyName(reference.propertyPath),
-          variableId: reference.variableId
+          variableId: reference.variableId,
+          nodeId: node.id
         });
       });
     }
@@ -1523,96 +1707,41 @@ async function buildBrokenTokensReport(): Promise<BrokenTokensResult> {
   const localVariableIds = new Set(allLocalVariables.map(function (variable) {
     return variable.id;
   }));
+
+  // Which library collections Figma can currently see for this file — gates the
+  // per-variable deletion check below so an unrelated, simply-not-enabled library
+  // (e.g. an unused alternate brand) never gets treated as "everything in it was
+  // deleted". Left empty (check skipped everywhere) if the API call itself fails.
+  let availableCollectionKeys = new Set<string>();
+  try {
+    const availableCollections = await figma.teamLibrary.getAvailableLibraryVariableCollectionsAsync();
+    availableCollectionKeys = new Set(availableCollections.map(function (entry) {
+      return entry.key;
+    }));
+  } catch (error) {
+    availableCollectionKeys = new Set<string>();
+  }
+
   const trulyBrokenIds = new Set<string>();
   const brokenDetails = new Map<string, string>();
 
+  const chainMemo = new Map<string, Promise<AliasChainCheck>>();
+  const libraryVariableKeysMemo = new Map<string, Promise<Set<string> | null>>();
+
   for (const variableId of uniqueVariableIds) {
-    try {
-      const variable = await figma.variables.getVariableByIdAsync(variableId);
-      const runtimeVariable = variable as RuntimeVariableLike | null;
+    const check = await checkVariableChain(
+      variableId,
+      localVariableIds,
+      availableCollectionKeys,
+      libraryVariableKeysMemo,
+      chainMemo,
+      new Set<string>(),
+      0
+    );
 
-      if (!runtimeVariable) {
-        trulyBrokenIds.add(variableId);
-        brokenDetails.set(variableId, "Переменная не найдена");
-        continue;
-      }
-
-      if (runtimeVariable.remote === false && !localVariableIds.has(variableId)) {
-        trulyBrokenIds.add(variableId);
-        brokenDetails.set(
-          variableId,
-          "\"" + (runtimeVariable.name || variableId) + "\" (локальная переменная удалена)"
-        );
-        continue;
-      }
-
-      let collectionName = "Unknown";
-
-      try {
-        const collection = await figma.variables.getVariableCollectionByIdAsync(runtimeVariable.variableCollectionId || "");
-
-        if (!collection) {
-          trulyBrokenIds.add(variableId);
-          brokenDetails.set(
-            variableId,
-            "\"" + (runtimeVariable.name || variableId) + "\" (коллекция удалена)"
-          );
-          continue;
-        }
-
-        const runtimeCollection = collection as RuntimeVariableCollectionLike;
-        collectionName = runtimeCollection.name || "Unknown";
-      } catch (error) {
-        trulyBrokenIds.add(variableId);
-        brokenDetails.set(
-          variableId,
-          "\"" + (runtimeVariable.name || variableId) + "\" (коллекция недоступна)"
-        );
-        continue;
-      }
-
-      if (runtimeVariable.remote === true && !runtimeVariable.key) {
-        trulyBrokenIds.add(variableId);
-        brokenDetails.set(
-          variableId,
-          "\"" + (runtimeVariable.name || variableId) + "\" (библиотека отключена)"
-        );
-        continue;
-      }
-
-      let hasBrokenAlias = false;
-      const valuesByMode = runtimeVariable.valuesByMode || {};
-
-      for (const value of Object.values(valuesByMode)) {
-        if (!isAliasLike(value)) {
-          continue;
-        }
-
-        try {
-          const aliasedVariable = await figma.variables.getVariableByIdAsync(value.id);
-          if (!aliasedVariable) {
-            hasBrokenAlias = true;
-            break;
-          }
-        } catch (error) {
-          hasBrokenAlias = true;
-          break;
-        }
-      }
-
-      if (hasBrokenAlias) {
-        trulyBrokenIds.add(variableId);
-        brokenDetails.set(
-          variableId,
-          "\"" + (runtimeVariable.name || variableId) + "\" из \"" + collectionName + "\" (разорванный алиас)"
-        );
-      }
-    } catch (error) {
+    if (check.broken) {
       trulyBrokenIds.add(variableId);
-      brokenDetails.set(
-        variableId,
-        "Ошибка доступа: " + (error instanceof Error ? error.message : "Unknown error")
-      );
+      brokenDetails.set(variableId, check.reason);
     }
   }
 
@@ -1646,8 +1775,23 @@ async function buildBrokenTokensReport(): Promise<BrokenTokensResult> {
     };
   }
 
-  const paths = brokenReferences.map(function (reference, index) {
-    return (index + 1) + ". " + reference.path;
+  const brokenVariableNames = new Map<string, string>();
+
+  for (const variableId of trulyBrokenIds) {
+    try {
+      const variable = await figma.variables.getVariableByIdAsync(variableId);
+      brokenVariableNames.set(variableId, variable ? variable.name : variableId);
+    } catch (error) {
+      brokenVariableNames.set(variableId, variableId);
+    }
+  }
+
+  const paths: BrokenTokenPath[] = brokenReferences.map(function (reference, index) {
+    return {
+      text: (index + 1) + ". " + reference.path,
+      nodeId: reference.nodeId,
+      variableName: brokenVariableNames.get(reference.variableId) || ""
+    };
   });
 
   const detailLines = Array.from(trulyBrokenIds).map(function (variableId) {

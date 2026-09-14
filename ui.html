@@ -1257,6 +1257,30 @@
           .replaceAll("'", "&#39;");
       }
 
+      function renderBrokenTokenPath(path) {
+        const nodeId = path && path.nodeId ? path.nodeId : "";
+        const text = path && path.text ? path.text : "";
+        const variableName = path && path.variableName ? path.variableName : "";
+        const nodeIds = nodeId ? [nodeId] : [];
+        const disabled = nodeIds.length ? "" : "disabled";
+        const title = nodeIds.length ? "Выделить этот слой" : "Слой недоступен";
+
+        return `
+          <li class="library-token-row">
+            <span class="library-token-name">${escapeHtml(text)}</span>
+            <button
+              type="button"
+              class="icon-btn select-token-btn"
+              data-select-node-ids='${escapeHtml(JSON.stringify(nodeIds))}'
+              data-copy-name="${escapeHtml(variableName)}"
+              title="${escapeHtml(title)}"
+              aria-label="${escapeHtml(title)}"
+              ${disabled}
+            >${ICON_TARGET}</button>
+          </li>
+        `;
+      }
+
       function renderBrokenTokensResult(data) {
         lastBrokenTokensResult = data;
 
@@ -1282,10 +1306,10 @@
                 <button id="toggleBrokenPaths" class="secondary-btn toggle-details">
                   ${brokenPathsExpanded ? "Скрыть подробности" : "Показать подробности"}
                 </button>
-                <div class="details-panel ${brokenPathsExpanded ? "" : "hidden"}" id="brokenPathsPanel">
+                <div class="plain-list-panel ${brokenPathsExpanded ? "" : "hidden"}" id="brokenPathsPanel">
                   <div class="section-title">Где найдено</div>
-                  <ul class="details-list">
-                    ${paths.map((path) => `<li>${escapeHtml(path)}</li>`).join("")}
+                  <ul class="library-token-list">
+                    ${paths.map(renderBrokenTokenPath).join("")}
                   </ul>
                 </div>
               </div>
@@ -1297,6 +1321,8 @@
           ${detailsHtml}
           ${pathsHtml}
         `;
+
+        wireSelectNodeIdButtons();
 
         const toggleButton = document.getElementById("toggleBrokenPaths");
         if (toggleButton) {
@@ -1350,9 +1376,8 @@
         copyResultButton.innerHTML = ICON_COPY;
       }
 
-      function copyResultToClipboard() {
-        const text = (resultText.innerText || resultText.textContent || "").trim();
-        if (!text) return;
+      function copyTextToClipboard(text) {
+        if (!text) return false;
 
         const textarea = document.createElement("textarea");
         textarea.value = text;
@@ -1362,8 +1387,23 @@
         textarea.focus();
         textarea.select();
 
+        let ok = false;
         try {
           document.execCommand("copy");
+          ok = true;
+        } catch (error) {
+          debugLog("copy failed", error);
+        }
+
+        document.body.removeChild(textarea);
+        return ok;
+      }
+
+      function copyResultToClipboard() {
+        const text = (resultText.innerText || resultText.textContent || "").trim();
+        if (!text) return;
+
+        if (copyTextToClipboard(text)) {
           debugLog("copy result: ok");
           if (copyResultButton) {
             copyResultButton.innerHTML = ICON_COPIED;
@@ -1373,11 +1413,7 @@
               copyResultButton.title = "Скопировать результат";
             }, 1200);
           }
-        } catch (error) {
-          debugLog("copy result failed", error);
         }
-
-        document.body.removeChild(textarea);
       }
 
       if (copyResultButton) {
@@ -1625,6 +1661,7 @@
               type="button"
               class="icon-btn select-token-btn"
               data-select-node-ids='${escapeHtml(JSON.stringify(nodeIds))}'
+              data-copy-name="${escapeHtml(token.variableName || "")}"
               title="${escapeHtml(title)}"
               aria-label="${escapeHtml(title)}"
               ${disabled}
@@ -1697,6 +1734,22 @@
 
             debugLog("select-nodes click", { count: nodeIds.length });
             parent.postMessage({ pluginMessage: { type: "select-nodes", nodeIds } }, "*");
+
+            // Figma's Plugin API has no way to open the native Variables panel with a
+            // token pre-selected — so alongside selecting the layer, copy the token's
+            // full name to the clipboard for a quick paste into that panel's own search.
+            const copyName = button.getAttribute("data-copy-name");
+            if (copyName && copyTextToClipboard(copyName)) {
+              const originalTitle = button.getAttribute("data-original-title") || button.title;
+              button.setAttribute("data-original-title", originalTitle);
+              const originalIcon = button.innerHTML;
+              button.innerHTML = ICON_COPIED;
+              button.title = "Имя токена скопировано";
+              setTimeout(() => {
+                button.innerHTML = originalIcon;
+                button.title = originalTitle;
+              }, 1200);
+            }
           });
         });
       }
